@@ -61,11 +61,12 @@ export function Home() {
 }
 
 function formatDate(iso: string): string {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (iso === todayIso) return "today";
   const d = new Date(iso + "T00:00:00");
-  const today = new Date();
-  const diff = Math.round((today.getTime() - d.getTime()) / (86_400_000));
-  if (diff === 0) return "today";
+  const today = new Date(todayIso + "T00:00:00");
+  const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
   if (diff === 1) return "yesterday";
-  if (diff < 7) return `${diff} days ago`;
+  if (diff > 0 && diff < 7) return `${diff} days ago`;
   return d.toLocaleDateString();
 }
