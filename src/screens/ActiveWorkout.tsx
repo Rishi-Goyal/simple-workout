@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { HowTo } from "../components/HowTo";
 import { Link, useNavigate } from "react-router-dom";
 import {
   finishWorkout,
@@ -99,12 +100,18 @@ function ExerciseCard({ workoutId, exerciseId }: { workoutId: number; exerciseId
         </span>
       </div>
 
+      {ex.description && (
+        <p className="mt-1 text-xs text-slate-400">{ex.description}</p>
+      )}
+
       <div className="mt-2 text-sm text-slate-300">
         <span className="font-medium text-slate-100">
           {rec.target_sets} × {rec.target_reps} @ {rec.weight_kg} kg
         </span>{" "}
         <span className="text-slate-400">— {rec.reason}</span>
       </div>
+
+      {ex.how_to && <HowTo text={ex.how_to} />}
 
       {sets.length > 0 && (
         <ul className="mt-3 space-y-1 text-sm">
@@ -119,7 +126,7 @@ function ExerciseCard({ workoutId, exerciseId }: { workoutId: number; exerciseId
         </ul>
       )}
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex gap-2 items-end">
         <label className="flex-1">
           <div className="text-xs text-slate-400">Weight (kg)</div>
           <input

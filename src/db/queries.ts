@@ -14,6 +14,8 @@ export type Exercise = {
   upper_body: number;
   is_custom: number;
   archived: number;
+  description: string;
+  how_to: string;
 };
 
 function hydrateExercise(r: Row): Exercise {
@@ -43,12 +45,15 @@ export function addCustomExercise(input: {
   equipment: string;
   rep_scheme: "compound" | "isolation";
   upper_body: boolean;
+  description?: string;
+  how_to?: string;
 }): number {
   run(
     `INSERT INTO exercises
       (name, category, primary_muscle, secondary_muscles_json,
-       equipment, rep_scheme, is_compound, upper_body, is_custom)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+       equipment, rep_scheme, is_compound, upper_body, is_custom,
+       description, how_to)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     [
       input.name,
       input.category,
@@ -57,7 +62,9 @@ export function addCustomExercise(input: {
       input.equipment,
       input.rep_scheme,
       input.rep_scheme === "compound" ? 1 : 0,
-      input.upper_body ? 1 : 0
+      input.upper_body ? 1 : 0,
+      input.description ?? "",
+      input.how_to ?? ""
     ]
   );
   const id = lastInsertId();

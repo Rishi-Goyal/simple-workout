@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { addCustomExercise, archiveExercise, listExercises, type DayType } from "../db/queries";
 import { useDbVersion } from "../db/client";
+import { HowTo } from "../components/HowTo";
 
 const MUSCLES = [
   "chest", "front_delts", "side_delts", "rear_delts", "triceps", "biceps",
@@ -130,21 +131,27 @@ export function Exercises() {
 
       <ul className="space-y-2">
         {all.map((ex) => (
-          <li key={ex.id} className="flex items-center justify-between rounded-xl bg-slate-800 p-3">
-            <div>
-              <div className="font-medium">{ex.name}</div>
-              <div className="text-xs text-slate-400 capitalize">
-                {ex.category} · {ex.primary_muscle.replace("_", " ")} ·{" "}
-                {ex.is_compound ? "compound" : "isolation"}
-                {ex.is_custom ? " · custom" : ""}
+          <li key={ex.id} className="rounded-xl bg-slate-800 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-medium">{ex.name}</div>
+                <div className="text-xs text-slate-400 capitalize">
+                  {ex.category} · {ex.primary_muscle.replace("_", " ")} ·{" "}
+                  {ex.is_compound ? "compound" : "isolation"}
+                  {ex.is_custom ? " · custom" : ""}
+                </div>
+                {ex.description && (
+                  <p className="mt-1 text-sm text-slate-300">{ex.description}</p>
+                )}
               </div>
+              <button
+                onClick={() => archiveExercise(ex.id)}
+                className="text-xs text-slate-400 hover:text-red-400"
+              >
+                archive
+              </button>
             </div>
-            <button
-              onClick={() => archiveExercise(ex.id)}
-              className="text-xs text-slate-400 hover:text-red-400"
-            >
-              archive
-            </button>
+            {ex.how_to && <HowTo text={ex.how_to} />}
           </li>
         ))}
       </ul>

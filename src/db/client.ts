@@ -42,8 +42,35 @@ async function initDb(): Promise<void> {
   }
 
   db!.exec(SCHEMA_SQL);
+  migrate();
   seedIfEmpty();
+  refreshSeedDescriptions();
   notifyReady();
+}
+
+// Additive migrations for older DB files that pre-date a column.
+// SQLite has no IF NOT EXISTS for ADD COLUMN, so we wrap and ignore.
+function migrate() {
+  const additions = [
+    "ALTER TABLE exercises ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE exercises ADD COLUMN how_to TEXT NOT NULL DEFAULT ''"
+  ];
+  for (const sql of additions) {
+    try { db!.exec(sql); } catch { /* column already exists */ }
+  }
+}
+
+// Keeps seed instructions in sync when we ship updated copy.
+function refreshSeedDescriptions() {
+  for (const e of SEED_EXERCISES) {
+    db!.exec({
+      sql: `UPDATE exercises
+              SET description = ?, how_to = ?
+            WHERE name = ? AND is_custom = 0
+              AND (description = '' OR how_to = '')`,
+      bind: [e.description, e.how_to, e.name]
+    });
+  }
 }
 
 function seedIfEmpty() {
@@ -59,8 +86,9 @@ function seedIfEmpty() {
     db!.exec({
       sql: `INSERT INTO exercises
               (name, category, primary_muscle, secondary_muscles_json,
-               equipment, rep_scheme, is_compound, upper_body, is_custom)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+               equipment, rep_scheme, is_compound, upper_body, is_custom,
+               description, how_to)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
       bind: [
         e.name,
         e.category,
@@ -69,7 +97,9 @@ function seedIfEmpty() {
         e.equipment,
         e.rep_scheme,
         e.rep_scheme === "compound" ? 1 : 0,
-        e.upper_body ? 1 : 0
+        e.upper_body ? 1 : 0,
+        e.description,
+        e.how_to
       ]
     });
   }
