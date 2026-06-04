@@ -2,11 +2,15 @@ import { useMemo, useState } from "react";
 import { HowTo } from "../components/HowTo";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  countWarmupCompletions,
+  deleteSet,
   finishWorkout,
   getExercise,
   getWorkout,
   logSet,
-  setsForExerciseInWorkout
+  setsForExerciseInWorkout,
+  updateSet,
+  type WorkoutSet
 } from "../db/queries";
 import { recommendFor } from "../lib/recommend";
 import { recordStrengthFromSet } from "../lib/strength";
@@ -35,12 +39,21 @@ export function ActiveWorkout() {
     return <div className="text-slate-400">Workout not found.</div>;
   }
 
+  const warmupCount = countWarmupCompletions(workoutId);
+
   return (
     <div className="space-y-6">
       <header className="flex items-baseline justify-between">
         <div>
           <h1 className="text-2xl font-bold capitalize">{workout.day_type} day</h1>
-          <p className="text-sm text-slate-400">{workout.date}</p>
+          <p className="text-sm text-slate-400">
+            {workout.date}
+            {warmupCount > 0 && (
+              <span className="ml-2 inline-flex items-center rounded-full bg-emerald-900/40 px-2 py-0.5 text-xs text-emerald-300">
+                Warmup ✓ {warmupCount}
+              </span>
+            )}
+          </p>
         </div>
         <button
           onClick={() => {
@@ -63,17 +76,96 @@ export function ActiveWorkout() {
   );
 }
 
+function LoggedSetRow({ set }: { set: WorkoutSet }) {
+  const [editing, setEditing] = useState(false);
+  const [weight, setWeight] = useState<string>(String(set.weight_kg));
+  const [reps, setReps] = useState<string>(String(set.reps));
+
+  if (!editing) {
+    return (
+      <li className="flex justify-between text-slate-300">
+        <span>Set {set.set_number}</span>
+        <span className="flex items-center gap-3">
+          <span>
+            {set.weight_kg} kg × {set.reps}
+          </span>
+          <button
+            onClick={() => {
+              setWeight(String(set.weight_kg));
+              setReps(String(set.reps));
+              setEditing(true);
+            }}
+            className="text-xs text-blue-400"
+            aria-label={`Edit set ${set.set_number}`}
+          >
+            edit
+          </button>
+        </span>
+      </li>
+    );
+  }
+
+  function onSave() {
+    const w = Number(weight);
+    const r = Number(reps);
+    if (!Number.isFinite(w) || !Number.isFinite(r) || r <= 0) return;
+    updateSet({ set_id: set.id, weight_kg: w, reps: r });
+    setEditing(false);
+  }
+
+  function onDelete() {
+    if (!confirm(`Delete set ${set.set_number}?`)) return;
+    deleteSet(set.id);
+  }
+
+  return (
+    <li className="flex items-center gap-2 text-slate-300">
+      <span className="shrink-0">Set {set.set_number}</span>
+      <input
+        inputMode="decimal"
+        value={weight}
+        onChange={(e) => setWeight(e.target.value)}
+        className="w-16 rounded bg-slate-900 px-2 py-1 text-sm"
+        aria-label="Weight (kg)"
+      />
+      <span className="text-xs text-slate-500">kg ×</span>
+      <input
+        inputMode="numeric"
+        value={reps}
+        onChange={(e) => setReps(e.target.value)}
+        className="w-12 rounded bg-slate-900 px-2 py-1 text-sm"
+        aria-label="Reps"
+      />
+      <button onClick={onSave} className="rounded bg-blue-600 px-2 py-1 text-xs">
+        Save
+      </button>
+      <button
+        onClick={() => setEditing(false)}
+        className="rounded bg-slate-700 px-2 py-1 text-xs"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={onDelete}
+        className="ml-auto rounded bg-red-900/60 px-2 py-1 text-xs text-red-200"
+      >
+        Delete
+      </button>
+    </li>
+  );
+}
+
 function ExerciseCard({ workoutId, exerciseId }: { workoutId: number; exerciseId: number }) {
   const ex = getExercise(exerciseId);
   const sets = setsForExerciseInWorkout(workoutId, exerciseId);
   const rec = useMemo(() => (ex ? recommendFor(ex, workoutId) : null), [ex, workoutId, sets.length]);
-  const [weight, setWeight] = useState<string>("");
-  const [reps, setReps] = useState<string>("");
+  const [weight, setWeight] = useState<string | null>(null);
+  const [reps, setReps] = useState<string | null>(null);
 
   if (!ex || !rec) return null;
 
-  const wForInput = weight === "" ? String(rec.weight_kg) : weight;
-  const rForInput = reps === "" ? String(rec.target_reps) : reps;
+  const wForInput = weight === null ? String(rec.weight_kg) : weight;
+  const rForInput = reps === null ? String(rec.target_reps) : reps;
 
   function onLog() {
     const w = Number(wForInput);
@@ -87,8 +179,8 @@ function ExerciseCard({ workoutId, exerciseId }: { workoutId: number; exerciseId
       reps: r
     });
     recordStrengthFromSet({ exercise_id: exerciseId, set_id: setId, weight_kg: w, reps: r });
-    setWeight("");
-    setReps("");
+    setWeight(null);
+    setReps(null);
   }
 
   return (
@@ -116,12 +208,7 @@ function ExerciseCard({ workoutId, exerciseId }: { workoutId: number; exerciseId
       {sets.length > 0 && (
         <ul className="mt-3 space-y-1 text-sm">
           {sets.map((s) => (
-            <li key={s.id} className="flex justify-between text-slate-300">
-              <span>Set {s.set_number}</span>
-              <span>
-                {s.weight_kg} kg × {s.reps}
-              </span>
-            </li>
+            <LoggedSetRow key={s.id} set={s} />
           ))}
         </ul>
       )}

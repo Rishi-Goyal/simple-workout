@@ -155,6 +155,24 @@ export function logSet(input: {
   return id;
 }
 
+export function updateSet(input: {
+  set_id: number;
+  weight_kg: number;
+  reps: number;
+}) {
+  run(
+    "UPDATE workout_sets SET weight_kg = ?, reps = ? WHERE id = ?",
+    [input.weight_kg, input.reps, input.set_id]
+  );
+  notifyChange();
+}
+
+export function deleteSet(set_id: number) {
+  // Strength snapshots referencing this set cascade away via FK ON DELETE CASCADE.
+  run("DELETE FROM workout_sets WHERE id = ?", [set_id]);
+  notifyChange();
+}
+
 export function setsForWorkout(workout_id: number): WorkoutSet[] {
   return all<WorkoutSet>(
     "SELECT * FROM workout_sets WHERE workout_id = ? ORDER BY set_number, id",
@@ -232,6 +250,54 @@ export function snapshotsForMuscle(muscle: string): StrengthSnapshot[] {
     "SELECT * FROM muscle_strength_snapshot WHERE muscle = ? ORDER BY recorded_at",
     [muscle]
   );
+}
+
+// ---------- warmups ----------
+
+export type Warmup = {
+  id: number;
+  name: string;
+  day_type: DayType;
+  description: string;
+  how_to: string;
+  archived: number;
+};
+
+export function listWarmups(day_type: DayType): Warmup[] {
+  return all<Warmup>(
+    "SELECT * FROM warmups WHERE archived = 0 AND day_type = ? ORDER BY name",
+    [day_type]
+  );
+}
+
+export function getWarmup(id: number): Warmup | undefined {
+  return one<Warmup>("SELECT * FROM warmups WHERE id = ?", [id]);
+}
+
+export function daysSinceLastWarmup(warmup_id: number): number | null {
+  const r = one<{ last_at: string }>(
+    "SELECT MAX(completed_at) AS last_at FROM warmup_completions WHERE warmup_id = ?",
+    [warmup_id]
+  );
+  if (!r?.last_at) return null;
+  const diffMs = Date.now() - new Date(r.last_at).getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+export function logWarmupCompletion(workout_id: number, warmup_id: number) {
+  run(
+    "INSERT INTO warmup_completions (workout_id, warmup_id, completed_at) VALUES (?, ?, ?)",
+    [workout_id, warmup_id, new Date().toISOString()]
+  );
+  notifyChange();
+}
+
+export function countWarmupCompletions(workout_id: number): number {
+  const r = one<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM warmup_completions WHERE workout_id = ?",
+    [workout_id]
+  );
+  return Number(r?.n ?? 0);
 }
 
 export function allCurrentBests(): { muscle: string; est_1rm_kg: number; recorded_at: string }[] {

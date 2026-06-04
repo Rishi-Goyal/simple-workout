@@ -46,4 +46,21 @@ CREATE TABLE IF NOT EXISTS muscle_strength_snapshot (
 );
 
 CREATE INDEX IF NOT EXISTS idx_strength_muscle ON muscle_strength_snapshot(muscle, recorded_at);
+
+CREATE TABLE IF NOT EXISTS warmups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  day_type TEXT NOT NULL CHECK (day_type IN ('push','pull','legs')),
+  description TEXT NOT NULL DEFAULT '',
+  how_to TEXT NOT NULL DEFAULT '',
+  archived INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS warmup_completions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
+  warmup_id INTEGER NOT NULL REFERENCES warmups(id),
+  completed_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_warmup_completions_warmup ON warmup_completions(warmup_id, completed_at);
 `;

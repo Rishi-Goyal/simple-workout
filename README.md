@@ -1,5 +1,9 @@
 # Simple Workout
 
+**👉 Try it now: [rishi-goyal.github.io/simple-workout](https://rishi-goyal.github.io/simple-workout/)**
+
+Open the link on your phone, then tap **Install app** (Android Chrome) or **Share → Add to Home Screen** (iOS Safari). Works offline once installed.
+
 A mobile-first PWA for Push / Pull / Legs training. Picks today's exercises, recommends weights from your prior sessions, and tracks per-muscle strength progress over time. Fully offline — SQLite runs in the browser via WASM with OPFS persistence.
 
 ## Stack
@@ -25,7 +29,7 @@ Pushes to `main` deploy to GitHub Pages via `.github/workflows/deploy.yml`.
 
 One-time setup after creating the GitHub repo:
 1. **Settings → Pages → Source: GitHub Actions**.
-2. Push to `main`. The workflow builds and publishes to `https://<user>.github.io/simple-workout/`.
+2. Push to `main`. The workflow builds and publishes to <https://rishi-goyal.github.io/simple-workout/>.
 
 ## Releases
 

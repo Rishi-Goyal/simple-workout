@@ -27,7 +27,7 @@ export function Home() {
     }
     const workoutId = createWorkout(type);
     setActive(workoutId, picks.map((e) => e.id));
-    navigate("/workout/active");
+    navigate("/workout/warmup");
   }
 
   return (

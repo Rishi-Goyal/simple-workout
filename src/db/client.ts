@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { SCHEMA_SQL } from "./schema";
 import { SEED_EXERCISES } from "./seed";
+import { SEED_WARMUPS } from "./warmupSeed";
 
 // ---------- types ----------
 
@@ -44,6 +45,7 @@ async function initDb(): Promise<void> {
   db!.exec(SCHEMA_SQL);
   migrate();
   seedIfEmpty();
+  seedWarmupsIfEmpty();
   refreshSeedDescriptions();
   notifyReady();
 }
@@ -101,6 +103,24 @@ function seedIfEmpty() {
         e.description,
         e.how_to
       ]
+    });
+  }
+}
+
+function seedWarmupsIfEmpty() {
+  const rows = (db!.exec({
+    sql: "SELECT COUNT(*) AS n FROM warmups",
+    returnValue: "resultRows",
+    rowMode: "object"
+  }) as Row[]) ?? [];
+  const n = Number(rows[0]?.n ?? 0);
+  if (n > 0) return;
+
+  for (const w of SEED_WARMUPS) {
+    db!.exec({
+      sql: `INSERT INTO warmups (name, day_type, description, how_to)
+            VALUES (?, ?, ?, ?)`,
+      bind: [w.name, w.day_type, w.description, w.how_to]
     });
   }
 }
