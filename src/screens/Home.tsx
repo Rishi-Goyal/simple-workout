@@ -11,6 +11,7 @@ import {
   type DayType,
   type Workout
 } from "../db/queries";
+import { InstallPrompt } from "../components/InstallPrompt";
 import { selectExercisesFor } from "../lib/selectWorkout";
 import { useSession } from "../state/session";
 import { useDbVersion } from "../db/client";
@@ -69,6 +70,8 @@ export function Home() {
         <h1 className="text-2xl font-bold">Today</h1>
         <p className="text-sm text-slate-400">Pick a day type to start a workout.</p>
       </header>
+
+      <InstallPrompt />
 
       {unfinished.length > 0 && (
         <div className="space-y-3">
