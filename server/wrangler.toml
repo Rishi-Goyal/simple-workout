@@ -1,0 +1,14 @@
+name = "simple-workout-backup"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+
+# Fill database_id in after running: npx wrangler d1 create workout-backups
+[[d1_databases]]
+binding = "DB"
+database_name = "workout-backups"
+database_id = "46a184a3-007b-4a19-9a60-488a87afc8de"
+
+
+
+
+#https://simple-workout-backup.simple-workout.workers.dev

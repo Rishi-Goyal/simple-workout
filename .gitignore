@@ -10,3 +10,5 @@ Thumbs.db
 !.env.example
 tsconfig.tsbuildinfo
 .claude/launch.json
+.wrangler/
+.dev.vars

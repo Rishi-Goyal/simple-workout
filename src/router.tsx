@@ -6,6 +6,7 @@ import { WarmupScreen } from "./screens/WarmupScreen";
 import { History } from "./screens/History";
 import { Progress } from "./screens/Progress";
 import { Exercises } from "./screens/Exercises";
+import { Settings } from "./screens/Settings";
 
 // HashRouter is robust for GitHub Pages — no 404 fallback needed.
 export const router = createHashRouter([
@@ -17,7 +18,8 @@ export const router = createHashRouter([
       { path: "/workout/active", element: <ActiveWorkout /> },
       { path: "/history", element: <History /> },
       { path: "/progress", element: <Progress /> },
-      { path: "/exercises", element: <Exercises /> }
+      { path: "/exercises", element: <Exercises /> },
+      { path: "/settings", element: <Settings /> }
     ]
   }
 ]);

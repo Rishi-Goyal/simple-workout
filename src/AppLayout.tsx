@@ -5,7 +5,8 @@ const tabs = [
   { to: "/", label: "Today" },
   { to: "/history", label: "History" },
   { to: "/progress", label: "Progress" },
-  { to: "/exercises", label: "Exercises" }
+  { to: "/exercises", label: "Exercises" },
+  { to: "/settings", label: "Settings" }
 ];
 
 export function AppLayout() {
