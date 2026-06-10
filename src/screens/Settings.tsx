@@ -63,29 +63,41 @@ export function Settings() {
       </header>
 
       <section className="rounded-2xl bg-slate-800 p-4 space-y-3">
-        <h2 className="font-semibold">Backup server</h2>
-        <Field label="Server URL">
+        <h2 className="font-semibold">Backup account</h2>
+        <Field label="Username">
           <input
-            value={config.url}
-            onChange={(e) => setConfig({ ...config, url: e.target.value })}
-            placeholder="https://simple-workout-backup.you.workers.dev"
+            value={config.user}
+            onChange={(e) => setConfig({ ...config, user: e.target.value })}
             className="w-full rounded bg-slate-900 px-2 py-2"
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
+            autoComplete="username"
           />
         </Field>
-        <Field label="Access token">
+        <Field label="Password">
           <input
             type="password"
-            value={config.token}
-            onChange={(e) => setConfig({ ...config, token: e.target.value })}
+            value={config.password}
+            onChange={(e) => setConfig({ ...config, password: e.target.value })}
             className="w-full rounded bg-slate-900 px-2 py-2"
+            autoComplete="current-password"
           />
         </Field>
         <button onClick={save} className="w-full rounded-lg bg-blue-600 py-2 font-medium">
           {saved ? "Saved" : "Save"}
         </button>
+        <details className="text-xs text-slate-400">
+          <summary className="cursor-pointer">Advanced: server URL</summary>
+          <input
+            value={config.url}
+            onChange={(e) => setConfig({ ...config, url: e.target.value })}
+            className="mt-2 w-full rounded bg-slate-900 px-2 py-2 text-slate-200"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+        </details>
       </section>
 
       <section className="rounded-2xl bg-slate-800 p-4 space-y-3">

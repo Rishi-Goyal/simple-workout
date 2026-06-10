@@ -1,9 +1,10 @@
 // Backup/restore API for Simple Workout.
-// Three routes, Bearer-token auth, full JSON snapshots stored in D1.
+// Three routes, username/password (HTTP Basic) auth, full JSON snapshots in D1.
 
 interface Env {
   DB: D1Database;
-  BACKUP_TOKEN: string;
+  BACKUP_USER: string;
+  BACKUP_PASSWORD: string;
 }
 
 const ALLOWED_ORIGINS = [
@@ -32,15 +33,33 @@ function json(data: unknown, status: number, cors: Record<string, string>): Resp
   });
 }
 
+// Constant-time string compare. Length mismatch returns early (an acceptable
+// leak); timingSafeEqual throws on unequal-length buffers.
+function safeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  if (ab.byteLength !== bb.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(ab, bb);
+}
+
 function isAuthorized(request: Request, env: Env): boolean {
   const header = request.headers.get("Authorization") ?? "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  const enc = new TextEncoder();
-  const a = enc.encode(token);
-  const b = enc.encode(env.BACKUP_TOKEN);
-  // timingSafeEqual throws on unequal lengths; a length leak is acceptable here.
-  if (a.byteLength !== b.byteLength) return false;
-  return crypto.subtle.timingSafeEqual(a, b);
+  if (!header.startsWith("Basic ")) return false;
+  let decoded: string;
+  try {
+    decoded = atob(header.slice(6));
+  } catch {
+    return false;
+  }
+  const sep = decoded.indexOf(":");
+  if (sep === -1) return false;
+  const user = decoded.slice(0, sep);
+  const pass = decoded.slice(sep + 1);
+  // Check both halves (no short-circuit) to keep timing uniform.
+  const userOk = safeEqual(user, env.BACKUP_USER);
+  const passOk = safeEqual(pass, env.BACKUP_PASSWORD);
+  return userOk && passOk;
 }
 
 export default {
