@@ -42,6 +42,8 @@ async function initDb(): Promise<void> {
     db = new sqlite3.oo1.DB(":memory:", "c") as DbHandle;
   }
 
+  // FKs are off by default in SQLite; required for the ON DELETE CASCADEs.
+  db!.exec("PRAGMA foreign_keys = ON;");
   db!.exec(SCHEMA_SQL);
   migrate();
   seedIfEmpty();

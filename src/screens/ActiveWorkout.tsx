@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HowTo } from "../components/HowTo";
 import { Link, useNavigate } from "react-router-dom";
 import {
   countWarmupCompletions,
   deleteSet,
+  exercisesForWorkout,
   finishWorkout,
   getExercise,
   getWorkout,
@@ -19,8 +20,21 @@ import { useDbVersion } from "../db/client";
 
 export function ActiveWorkout() {
   const navigate = useNavigate();
-  const { workoutId, exerciseIds, clear } = useSession();
+  const { workoutId, exerciseIds, setActive, clear } = useSession();
   useDbVersion();
+
+  const workout = workoutId != null ? getWorkout(workoutId) : undefined;
+
+  // Self-heal a restored session: drop it if the workout row is gone or
+  // already finished; re-derive the exercise plan from the DB if missing.
+  useEffect(() => {
+    if (workoutId == null) return;
+    if (!workout || workout.finished_at) {
+      clear();
+    } else if (exerciseIds.length === 0) {
+      setActive(workoutId, exercisesForWorkout(workoutId));
+    }
+  }, [workoutId, workout?.finished_at, exerciseIds.length]);
 
   if (workoutId == null) {
     return (
@@ -34,7 +48,6 @@ export function ActiveWorkout() {
     );
   }
 
-  const workout = getWorkout(workoutId);
   if (!workout) {
     return <div className="text-slate-400">Workout not found.</div>;
   }

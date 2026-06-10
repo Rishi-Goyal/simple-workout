@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 export type SessionState = {
   workoutId: number | null;
@@ -11,15 +12,26 @@ export type SessionState = {
   clear(): void;
 };
 
-export const useSession = create<SessionState>((set) => ({
-  workoutId: null,
-  exerciseIds: [],
-  warmupIds: [],
-  warmupDone: {},
-  setActive: (workoutId, exerciseIds) => set({ workoutId, exerciseIds }),
-  setWarmups: (ids) => set({ warmupIds: ids, warmupDone: {} }),
-  toggleWarmupDone: (id) =>
-    set((s) => ({ warmupDone: { ...s.warmupDone, [id]: !s.warmupDone[id] } })),
-  clear: () =>
-    set({ workoutId: null, exerciseIds: [], warmupIds: [], warmupDone: {} })
-}));
+// Persisted to localStorage so an in-progress session survives the page
+// being killed (mobile tab switches, reloads). The workout itself lives in
+// SQLite; this is just the pointer to it plus ephemeral warmup state.
+export const useSession = create<SessionState>()(
+  persist(
+    (set) => ({
+      workoutId: null,
+      exerciseIds: [],
+      warmupIds: [],
+      warmupDone: {},
+      setActive: (workoutId, exerciseIds) => set({ workoutId, exerciseIds }),
+      setWarmups: (ids) => set({ warmupIds: ids, warmupDone: {} }),
+      toggleWarmupDone: (id) =>
+        set((s) => ({ warmupDone: { ...s.warmupDone, [id]: !s.warmupDone[id] } })),
+      clear: () =>
+        set({ workoutId: null, exerciseIds: [], warmupIds: [], warmupDone: {} })
+    }),
+    {
+      name: "workout-session",
+      storage: createJSONStorage(() => localStorage)
+    }
+  )
+);

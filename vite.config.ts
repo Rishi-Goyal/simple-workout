@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg"],
+      includeAssets: ["favicon.svg", "apple-touch-icon-180x180.png"],
       manifest: {
         name: "Simple Workout",
         short_name: "Workout",
@@ -18,10 +18,13 @@ export default defineConfig({
         display: "standalone",
         start_url: "/simple-workout/",
         scope: "/simple-workout/",
-        // SVG icon for v1 — replace with PNG 192/512/512-maskable before
-        // shipping to iOS users (Safari home-screen icons need PNG).
+        // Chrome on Android requires real 192/512 PNG bitmaps for the
+        // install prompt (WebAPK minting); the SVG alone is not enough.
         icons: [
-          { src: "favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }
+          { src: "favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+          { src: "pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "maskable-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
         ]
       },
       workbox: {

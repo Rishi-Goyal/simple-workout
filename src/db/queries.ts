@@ -87,12 +87,37 @@ export type Workout = {
   finished_at: string | null;
 };
 
-export function createWorkout(day_type: DayType): number {
+export function createWorkout(day_type: DayType, exerciseIds: number[]): number {
   const today = new Date().toISOString().slice(0, 10);
   run("INSERT INTO workouts (date, day_type) VALUES (?, ?)", [today, day_type]);
   const id = lastInsertId();
+  exerciseIds.forEach((eid, i) => {
+    run(
+      "INSERT INTO workout_exercises (workout_id, exercise_id, position) VALUES (?, ?, ?)",
+      [id, eid, i]
+    );
+  });
   notifyChange();
   return id;
+}
+
+export function exercisesForWorkout(workout_id: number): number[] {
+  return all<{ exercise_id: number }>(
+    "SELECT exercise_id FROM workout_exercises WHERE workout_id = ? ORDER BY position",
+    [workout_id]
+  ).map((r) => r.exercise_id);
+}
+
+export function unfinishedWorkouts(): Workout[] {
+  return all<Workout>(
+    "SELECT * FROM workouts WHERE finished_at IS NULL ORDER BY id DESC"
+  );
+}
+
+export function discardWorkout(id: number) {
+  // workout_exercises, workout_sets and warmup_completions cascade away.
+  run("DELETE FROM workouts WHERE id = ?", [id]);
+  notifyChange();
 }
 
 export function getWorkout(id: number): Workout | undefined {

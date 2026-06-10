@@ -1,5 +1,16 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { createWorkout, lastWorkoutOfType, type DayType } from "../db/queries";
+import {
+  createWorkout,
+  discardWorkout,
+  exercisesForWorkout,
+  getWorkout,
+  lastWorkoutOfType,
+  setsForWorkout,
+  unfinishedWorkouts,
+  type DayType,
+  type Workout
+} from "../db/queries";
 import { selectExercisesFor } from "../lib/selectWorkout";
 import { useSession } from "../state/session";
 import { useDbVersion } from "../db/client";
@@ -13,7 +24,18 @@ const DAYS: { type: DayType; label: string; color: string }[] = [
 export function Home() {
   const navigate = useNavigate();
   const setActive = useSession((s) => s.setActive);
+  const sessionWorkoutId = useSession((s) => s.workoutId);
+  const clear = useSession((s) => s.clear);
   useDbVersion(); // re-render after writes
+
+  // Drop a persisted session whose workout was finished or deleted elsewhere.
+  useEffect(() => {
+    if (sessionWorkoutId == null) return;
+    const w = getWorkout(sessionWorkoutId);
+    if (!w || w.finished_at) clear();
+  }, [sessionWorkoutId]);
+
+  const unfinished = unfinishedWorkouts();
 
   const lastByType = Object.fromEntries(
     DAYS.map((d) => [d.type, lastWorkoutOfType(d.type)])
@@ -25,9 +47,20 @@ export function Home() {
       alert(`No ${type} exercises in the catalog yet — add some on the Exercises tab.`);
       return;
     }
-    const workoutId = createWorkout(type);
+    const workoutId = createWorkout(type, picks.map((e) => e.id));
     setActive(workoutId, picks.map((e) => e.id));
     navigate("/workout/warmup");
+  }
+
+  function resume(w: Workout) {
+    setActive(w.id, exercisesForWorkout(w.id));
+    navigate("/workout/active");
+  }
+
+  function discard(w: Workout) {
+    if (!confirm(`Discard the unfinished ${w.day_type} workout and its sets?`)) return;
+    discardWorkout(w.id);
+    if (sessionWorkoutId === w.id) clear();
   }
 
   return (
@@ -36,6 +69,42 @@ export function Home() {
         <h1 className="text-2xl font-bold">Today</h1>
         <p className="text-sm text-slate-400">Pick a day type to start a workout.</p>
       </header>
+
+      {unfinished.length > 0 && (
+        <div className="space-y-3">
+          {unfinished.map((w) => {
+            const setCount = setsForWorkout(w.id).length;
+            return (
+              <div
+                key={w.id}
+                className="rounded-2xl bg-slate-800 p-4 shadow ring-1 ring-blue-600/40"
+              >
+                <div className="text-sm text-slate-400">Unfinished workout</div>
+                <div className="mt-0.5 font-semibold">
+                  <span className="capitalize">{w.day_type}</span> day — {formatDate(w.date)}
+                  <span className="ml-2 text-sm font-normal text-slate-400">
+                    {setCount} set{setCount === 1 ? "" : "s"} logged
+                  </span>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => resume(w)}
+                    className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium"
+                  >
+                    Resume
+                  </button>
+                  <button
+                    onClick={() => discard(w)}
+                    className="rounded-lg bg-slate-700 px-4 py-2 text-sm text-slate-300"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="grid gap-3">
         {DAYS.map((d) => {

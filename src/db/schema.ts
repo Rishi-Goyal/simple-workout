@@ -23,6 +23,15 @@ CREATE TABLE IF NOT EXISTS workouts (
   finished_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS workout_exercises (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
+  exercise_id INTEGER NOT NULL REFERENCES exercises(id),
+  position INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_workout_exercises_workout ON workout_exercises(workout_id, position);
+
 CREATE TABLE IF NOT EXISTS workout_sets (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
