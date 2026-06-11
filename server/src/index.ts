@@ -1,10 +1,11 @@
 // Backup/restore API for Simple Workout.
 // Three routes, username/password (HTTP Basic) auth, full JSON snapshots in D1.
+// Each backup is owned by the authenticated user; users never see each other's.
 
 interface Env {
   DB: D1Database;
-  BACKUP_USER: string;
-  BACKUP_PASSWORD: string;
+  // JSON map of username -> password, e.g. {"ironborn":"dungeonfit"}.
+  BACKUP_USERS: string;
 }
 
 const ALLOWED_ORIGINS = [
@@ -43,23 +44,33 @@ function safeEqual(a: string, b: string): boolean {
   return crypto.subtle.timingSafeEqual(ab, bb);
 }
 
-function isAuthorized(request: Request, env: Env): boolean {
+// Returns the authenticated username, or null if the credentials don't match
+// any account in the BACKUP_USERS map.
+function authenticate(request: Request, env: Env): string | null {
   const header = request.headers.get("Authorization") ?? "";
-  if (!header.startsWith("Basic ")) return false;
+  if (!header.startsWith("Basic ")) return null;
   let decoded: string;
   try {
     decoded = atob(header.slice(6));
   } catch {
-    return false;
+    return null;
   }
   const sep = decoded.indexOf(":");
-  if (sep === -1) return false;
+  if (sep === -1) return null;
   const user = decoded.slice(0, sep);
   const pass = decoded.slice(sep + 1);
-  // Check both halves (no short-circuit) to keep timing uniform.
-  const userOk = safeEqual(user, env.BACKUP_USER);
-  const passOk = safeEqual(pass, env.BACKUP_PASSWORD);
-  return userOk && passOk;
+
+  let users: Record<string, string>;
+  try {
+    users = JSON.parse(env.BACKUP_USERS);
+  } catch {
+    return null;
+  }
+  const expected = users[user];
+  // Compare against a dummy when the user is unknown so timing doesn't reveal
+  // which usernames exist.
+  const ok = safeEqual(pass, typeof expected === "string" ? expected : "\0");
+  return ok && typeof expected === "string" ? user : null;
 }
 
 export default {
@@ -70,7 +81,8 @@ export default {
       return new Response(null, { status: 204, headers: cors });
     }
 
-    if (!isAuthorized(request, env)) {
+    const user = authenticate(request, env);
+    if (!user) {
       return json({ error: "unauthorized" }, 401, cors);
     }
 
@@ -92,18 +104,22 @@ export default {
         }
 
         const result = await env.DB.prepare(
-          `INSERT INTO backups (schema_version, app_version, size_bytes, payload)
-           VALUES (?, ?, ?, ?)
+          `INSERT INTO backups (username, schema_version, app_version, size_bytes, payload)
+           VALUES (?, ?, ?, ?, ?)
            RETURNING id, created_at`
         )
-          .bind(body.version, null, text.length, text)
+          .bind(user, body.version, null, text.length, text)
           .first<{ id: number; created_at: string }>();
 
+        // Keep only this user's most recent backups.
         await env.DB.prepare(
           `DELETE FROM backups
-           WHERE id NOT IN (SELECT id FROM backups ORDER BY id DESC LIMIT ?)`
+           WHERE username = ?
+             AND id NOT IN (
+               SELECT id FROM backups WHERE username = ? ORDER BY id DESC LIMIT ?
+             )`
         )
-          .bind(KEEP_BACKUPS)
+          .bind(user, user, KEEP_BACKUPS)
           .run();
 
         return json(result, 201, cors);
@@ -111,8 +127,10 @@ export default {
 
       if (request.method === "GET" && url.pathname === "/backups/latest") {
         const row = await env.DB.prepare(
-          "SELECT payload FROM backups ORDER BY id DESC LIMIT 1"
-        ).first<{ payload: string }>();
+          "SELECT payload FROM backups WHERE username = ? ORDER BY id DESC LIMIT 1"
+        )
+          .bind(user)
+          .first<{ payload: string }>();
         if (!row) {
           return json({ error: "no backups" }, 404, cors);
         }
@@ -126,9 +144,9 @@ export default {
       if (request.method === "GET" && url.pathname === "/backups") {
         const rows = await env.DB.prepare(
           `SELECT id, created_at, schema_version, app_version, size_bytes
-           FROM backups ORDER BY id DESC LIMIT ?`
+           FROM backups WHERE username = ? ORDER BY id DESC LIMIT ?`
         )
-          .bind(KEEP_BACKUPS)
+          .bind(user, KEEP_BACKUPS)
           .all();
         return json(rows.results, 200, cors);
       }
