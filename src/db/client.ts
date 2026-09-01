@@ -20,6 +20,7 @@ let db: DbHandle | null = null;
 let initPromise: Promise<void> | null = null;
 const readyListeners = new Set<() => void>();
 let ready = false;
+let persistent = false;
 
 function notifyReady() {
   ready = true;
@@ -36,6 +37,7 @@ async function initDb(): Promise<void> {
   try {
     const pool = await sqlite3.installOpfsSAHPoolVfs({ name: "workout-pool" });
     db = new pool.OpfsSAHPoolDb("/workout.db") as DbHandle;
+    persistent = true;
     console.info("[db] using OPFS SAH Pool VFS");
   } catch (err) {
     console.warn("[db] OPFS unavailable, using in-memory DB", err);
@@ -159,6 +161,12 @@ export function run(sql: string, params: SqlValue[] = []): void {
 export function lastInsertId(): number {
   const r = one<{ id: number }>("SELECT last_insert_rowid() AS id");
   return Number(r?.id ?? 0);
+}
+
+// True when the DB is backed by OPFS; false means the in-memory fallback
+// is active and nothing survives a reload. Stable once the DB is ready.
+export function dbIsPersistent(): boolean {
+  return persistent;
 }
 
 // ---------- react hook ----------

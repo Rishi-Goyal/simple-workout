@@ -12,6 +12,7 @@ import {
   type Workout
 } from "../db/queries";
 import { InstallPrompt } from "../components/InstallPrompt";
+import { localDateIso } from "../lib/dates";
 import { selectExercisesFor } from "../lib/selectWorkout";
 import { useSession } from "../state/session";
 import { useDbVersion } from "../db/client";
@@ -133,7 +134,7 @@ export function Home() {
 }
 
 function formatDate(iso: string): string {
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = localDateIso();
   if (iso === todayIso) return "today";
   const d = new Date(iso + "T00:00:00");
   const today = new Date(todayIso + "T00:00:00");

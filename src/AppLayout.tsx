@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigation } from "react-router-dom";
-import { useDbReady } from "./db/client";
+import { dbIsPersistent, useDbReady } from "./db/client";
 
 const tabs = [
   { to: "/", label: "Today" },
@@ -23,6 +23,12 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full flex-col">
+      {!dbIsPersistent() && (
+        <div className="bg-amber-900/80 px-4 py-2 text-center text-xs text-amber-200">
+          Storage unavailable in this browser — data will be lost when you
+          close or reload this page.
+        </div>
+      )}
       <main className="flex-1 overflow-y-auto pb-20">
         <div className="mx-auto max-w-md px-4 py-4">
           <Outlet />

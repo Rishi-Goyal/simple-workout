@@ -30,33 +30,54 @@ function firstActivityAt(workoutId: number): string | null {
   return row?.first_at ?? null;
 }
 
-function putRecord(record: {
+// Opens the bridge DB at whatever version it currently has (the calorie
+// counter may bump it independently); if the store is missing, reopens one
+// version higher to create it.
+function openBridge(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(BRIDGE_DB);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(BRIDGE_STORE, { keyPath: "id" });
+    };
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (db.objectStoreNames.contains(BRIDGE_STORE)) {
+        resolve(db);
+        return;
+      }
+      const nextVersion = db.version + 1;
+      db.close();
+      const upgrade = indexedDB.open(BRIDGE_DB, nextVersion);
+      upgrade.onupgradeneeded = () => {
+        if (!upgrade.result.objectStoreNames.contains(BRIDGE_STORE)) {
+          upgrade.result.createObjectStore(BRIDGE_STORE, { keyPath: "id" });
+        }
+      };
+      upgrade.onerror = () => reject(upgrade.error);
+      upgrade.onsuccess = () => resolve(upgrade.result);
+    };
+  });
+}
+
+async function putRecord(record: {
   id: number;
   date: string;
   endedAt: number;
   type: string;
   minutes: number;
 }): Promise<void> {
+  const db = await openBridge();
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(BRIDGE_DB, 1);
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(BRIDGE_STORE)) {
-        req.result.createObjectStore(BRIDGE_STORE, { keyPath: "id" });
-      }
+    const tx = db.transaction(BRIDGE_STORE, "readwrite");
+    tx.objectStore(BRIDGE_STORE).put(record);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
     };
-    req.onerror = () => reject(req.error);
-    req.onsuccess = () => {
-      const db = req.result;
-      const tx = db.transaction(BRIDGE_STORE, "readwrite");
-      tx.objectStore(BRIDGE_STORE).put(record);
-      tx.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-      tx.onerror = () => {
-        db.close();
-        reject(tx.error);
-      };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
     };
   });
 }

@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   countWarmupCompletions,
   deleteSet,
+  deleteStrengthSnapshotsForSet,
   exercisesForWorkout,
   finishWorkout,
   getExercise,
@@ -126,7 +127,14 @@ function LoggedSetRow({ set }: { set: WorkoutSet }) {
     const w = Number(weight);
     const r = Number(reps);
     if (!Number.isFinite(w) || !Number.isFinite(r) || r <= 0) return;
+    deleteStrengthSnapshotsForSet(set.id);
     updateSet({ set_id: set.id, weight_kg: w, reps: r });
+    recordStrengthFromSet({
+      exercise_id: set.exercise_id,
+      set_id: set.id,
+      weight_kg: w,
+      reps: r
+    });
     setEditing(false);
   }
 
