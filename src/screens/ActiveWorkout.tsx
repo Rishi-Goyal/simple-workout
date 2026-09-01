@@ -14,6 +14,7 @@ import {
   type WorkoutSet
 } from "../db/queries";
 import { maybeAutoBackup } from "../lib/backupApi";
+import { publishWorkoutToBridge } from "../lib/calorieBridge";
 import { recommendFor } from "../lib/recommend";
 import { recordStrengthFromSet } from "../lib/strength";
 import { useSession } from "../state/session";
@@ -72,6 +73,7 @@ export function ActiveWorkout() {
         <button
           onClick={() => {
             finishWorkout(workoutId);
+            void publishWorkoutToBridge(workoutId);
             maybeAutoBackup();
             clear();
             navigate("/history");
