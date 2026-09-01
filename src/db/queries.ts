@@ -1,4 +1,5 @@
 import { all, one, run, lastInsertId, notifyChange, type Row } from "./client";
+import { localDateIso } from "../lib/dates";
 
 export type DayType = "push" | "pull" | "legs";
 
@@ -88,7 +89,7 @@ export type Workout = {
 };
 
 export function createWorkout(day_type: DayType, exerciseIds: number[]): number {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateIso();
   run("INSERT INTO workouts (date, day_type) VALUES (?, ?)", [today, day_type]);
   const id = lastInsertId();
   exerciseIds.forEach((eid, i) => {
@@ -190,6 +191,11 @@ export function updateSet(input: {
     [input.weight_kg, input.reps, input.set_id]
   );
   notifyChange();
+}
+
+// Drops snapshots sourced from a set so its edited values can be re-recorded.
+export function deleteStrengthSnapshotsForSet(set_id: number) {
+  run("DELETE FROM muscle_strength_snapshot WHERE source_set_id = ?", [set_id]);
 }
 
 export function deleteSet(set_id: number) {
