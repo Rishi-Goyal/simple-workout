@@ -95,6 +95,7 @@ Design rules for this screen:
 - **Rest timer starts itself** after each set — full-screen countdown with "skip", so the phone tells you when to go again.
 - **How-to is collapsed** behind one tap; the screen leads with a picture, not four paragraphs.
 - **"Too hard"** swaps the rung down *right now* and re-prescribes; "too easy" flags it for next session.
+- **"Swap exercise"** (behind the ⋯ menu) handles the distracted/derailed case — equipment taken, lost the thread, just not feeling it. It offers a *sideways* move: another exercise at the same rung in the same pattern (multiple exercises can share a `(pattern, rung)` slot, so this falls out of the data model), or **Skip** to move on with no penalty. Sideways swaps and skips never touch your ladder level — only "too hard" demotes.
 - Finish screen: summary, streak, then `publishWorkoutToBridge()` + auto-backup exactly as today.
 
 ### Everything else shrinks
@@ -116,7 +117,7 @@ exercises  (id, pattern_id, rung, name, equipment,
 user_levels(pattern_id, current_rung, updated_at)
 sessions   (id, date, plan_type, started_at, finished_at)
 session_items(session_id, exercise_id, position,
-            outcome)          -- 'done' | 'swapped_down' | 'skipped'
+            outcome)          -- 'done' | 'swapped_down' | 'swapped_alt' | 'skipped'
 sets       (id, session_id, exercise_id, set_number, reps, weight_kg, completed_at)
 ```
 
@@ -137,11 +138,25 @@ Both are pure and unit-testable — v1 had zero tests; v2's progression engine g
 
 **Phase 3 — Re-attach the plumbing.** Calorie bridge on finish, auto-backup, history, progress screen, resume-unfinished-session.
 
-**Phase 4 — Cut over.** One-time importer that copies v1 `workouts`/`workout_sets` into v2 history (read-only), deploy to the same GitHub Pages URL so the installed PWA just updates. Delete v1 screens.
+**Phase 4 — Import & cut over.** Run the v1 importer (below), deploy to the same GitHub Pages URL so the installed PWA just updates. Delete v1 screens.
 
-## Open questions (defaults chosen, easy to change)
+## The v1 import system
 
-1. **Split**: defaulting to the existing PPL rotation, app-managed. A 3-day full-body alternative is a seed-file change, not a code change.
-2. **Old data**: defaulting to *import history read-only, start ladders fresh* — calibration via "too easy" taps beats guessing rungs from old 1RMs.
-3. **Warmups**: defaulting to folding 2 warmup moves in as step 0 of the stepper, killing the separate screen.
-4. **Illustrations**: rung swaps only feel safe if you can see the easier form. Plan for simple line-art per exercise (static SVG is enough; no video).
+v2 ships with a real importer, not a "start over" shrug. Three paths, in order of preference:
+
+1. **Same-device OPFS import.** v1's SQLite file lives in OPFS on the same origin, so on first launch v2 opens the old database directly, copies `workouts` / `workout_sets` (+ exercise names) into v2 `sessions` / `sets`, and marks them `source: 'v1'`. Zero user action.
+2. **Backup-server restore.** For a new device, the existing Cloudflare Worker restore path pulls the v1 backup, then the same importer runs on it. Reuses `backupApi.ts` unchanged.
+3. **JSON export/import file.** Before cutover, v1 gets one tiny addition: an "Export all data (JSON)" button in Settings — a safety hatch that also becomes v2's manual import format.
+
+Mapping rules: v1 exercises are matched to v2 exercises by a hand-written name map in the seed file (`"Bench Press" → h_push/bench_press`); unmatched customs import as history-only rows (visible in History, never prescribed). Imported history is **read-only** and does *not* set ladder levels — first-session "too easy" taps calibrate rungs better than guessing from old 1RMs. The importer is idempotent (keyed on v1 row ids) so re-running it can't duplicate history.
+
+## Decisions (were open questions — now settled)
+
+1. **Split** — ✅ app-decided. The app manages the PPL rotation; the user never picks a day type. The escape hatches are per-exercise, mid-workout: "too hard" (rung down), "too easy" (flag for next time), "swap" (sideways alternative), "skip".
+2. **Old data** — ✅ build the import system above; ladders still start fresh.
+3. **Warmups** — ✅ folded in as step 0 of the stepper; separate screen deleted.
+4. **Illustrations** — ✅ trusted source only, verified once, frozen forever. Past experience: pulling media by name at runtime showed the *wrong exercise*. So v2 never fetches exercise media at runtime. Instead:
+   - Assets come from a vetted open dataset — first choice **[free-exercise-db](https://github.com/yuhonas/free-exercise-db)** (public domain, ~870 exercises with photos); fallback **wger** (CC-BY-SA, attribution in Settings → About).
+   - At build time, each seed exercise references its asset by **pinned file, committed to the repo** — never by name lookup, never by API call. Upstream changes can't silently swap an image.
+   - **One-time human verification gate:** the seed PR includes a review page showing every exercise name + how-to next to its image; nothing ships until each pairing is eyeballed and checked off. New exercises go through the same gate.
+   - Bundled locally so images work offline like everything else (~40 exercises ≈ a few hundred KB, fine for the PWA cache).
