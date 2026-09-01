@@ -1,0 +1,24 @@
+/* ============================================================
+   Google — Base resets & document defaults
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--body-medium-size);
+  line-height: var(--body-medium-line);
+  color: var(--text-primary);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--text-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+::selection { background: var(--google-blue-light); color: var(--grey-900); }
+
+:focus-visible { outline: 2px solid var(--action-primary); outline-offset: 2px; }

@@ -1,0 +1,161 @@
+/* ============================================================
+   Google — Color tokens
+   Source: Google brand template guide (uploads/Untitled presentation.pdf)
+   + the full Google Material tonal palette (red / blue / yellow /
+   green / grey, each 50 → 900).
+   "For the most part, white and the four core colors should be
+    all you need." — Google brand guide
+   ============================================================ */
+
+:root {
+  /* ---- Absolute neutrals -------------------------------- */
+  --color-white: #FFFFFF;
+  --color-black: #111111;
+
+  /* ---- Red ramp ----------------------------------------- */
+  --color-red-50:  #FCE8E6;
+  --color-red-100: #FAD2CF;
+  --color-red-200: #F6AEA9;
+  --color-red-300: #F28B82;
+  --color-red-400: #EE675C;
+  --color-red-500: #EA4335;
+  --color-red-600: #D93025;
+  --color-red-700: #C5221F;
+  --color-red-800: #B31412;
+  --color-red-900: #A50E0E;
+  --color-red: var(--color-red-500);
+
+  /* ---- Blue ramp ---------------------------------------- */
+  --color-blue-50:  #E8F0FE;
+  --color-blue-100: #D2E3FC;
+  --color-blue-200: #AECBFA;
+  --color-blue-300: #8AB4F8;
+  --color-blue-400: #669DF6;
+  --color-blue-500: #4285F4;
+  --color-blue-600: #1A73E8;
+  --color-blue-700: #1967D2;
+  --color-blue-800: #185ABC;
+  --color-blue-900: #174EA6;
+  --color-blue: var(--color-blue-500);
+
+  /* ---- Yellow ramp -------------------------------------- */
+  --color-yellow-50:  #FEF7E0;
+  --color-yellow-100: #FEEFC3;
+  --color-yellow-200: #FDE293;
+  --color-yellow-300: #FDD663;
+  --color-yellow-400: #FCC934;
+  --color-yellow-500: #FBBC04;
+  --color-yellow-600: #F9AB00;
+  --color-yellow-700: #F29900;
+  --color-yellow-800: #EA8600;
+  --color-yellow-900: #E37400;
+  --color-yellow: var(--color-yellow-500);
+
+  /* ---- Green ramp --------------------------------------- */
+  --color-green-50:  #E6F4EA;
+  --color-green-100: #CEEAD6;
+  --color-green-200: #A8DAB5;
+  --color-green-300: #81C995;
+  --color-green-400: #5BB974;
+  --color-green-500: #34A853;
+  --color-green-600: #1E8E3E;
+  --color-green-700: #188038;
+  --color-green-800: #137333;
+  --color-green-900: #0D652D;
+  --color-green: var(--color-green-500);
+
+  /* ---- Grey ramp (Google Grey) -------------------------- */
+  --color-grey-50:  #F8F9FA;
+  --color-grey-100: #F1F3F4;
+  --color-grey-200: #E8EAED;
+  --color-grey-300: #DADCE0; /* Cool Grey */
+  --color-grey-400: #BDC1C6;
+  --color-grey-500: #9AA0A6;
+  --color-grey-600: #80868B;
+  --color-grey-700: #5F6368;
+  --color-grey-800: #3C4043;
+  --color-grey-900: #202124;
+  --color-grey: var(--color-grey-500);
+
+  /* ============================================================
+     Core brand colors — the four + white. These do most of the
+     work. Aliased onto the 500 ramp stops.
+     ============================================================ */
+  --google-blue:   var(--color-blue-500);
+  --google-red:    var(--color-red-500);
+  --google-yellow: var(--color-yellow-500);
+  --google-green:  var(--color-green-500);
+  --google-white:  var(--color-white);
+
+  /* ---- Core color — tonal supporting tones -------------- */
+  /* Tertiary (light) tints */
+  --google-blue-light:  var(--color-blue-100);
+  --google-green-light: var(--color-green-100);
+
+  /* Secondary (dark) shades */
+  --google-blue-dark:   var(--color-blue-800);
+  --google-red-dark:    var(--color-red-800);
+  --google-yellow-dark: var(--color-yellow-800);
+  --google-green-dark:  var(--color-green-800);
+
+  /* ---- Neutrals — Google Grey scale (legacy aliases) ---- */
+  --grey-900: var(--color-grey-900);
+  --grey-800: var(--color-grey-800);
+  --grey-700: var(--color-grey-700);
+  --grey-600: var(--color-grey-600);
+  --grey-500: var(--color-grey-500);
+  --grey-400: var(--color-grey-400);
+  --grey-300: var(--color-grey-300);
+  --grey-200: var(--color-grey-200);
+  --grey-100: var(--color-grey-100);
+  --grey-50:  var(--color-grey-50);
+  --black: #000000;
+  --white: var(--color-white);
+
+  /* ============================================================
+     Semantic aliases — reference these in components
+     ============================================================ */
+
+  /* Text */
+  --text-primary: var(--grey-900);     /* default body + headings */
+  --text-secondary: var(--grey-700);   /* supporting / captions   */
+  --text-disabled: var(--grey-500);
+  --text-on-color: var(--white);       /* text on a brand fill    */
+  --text-link: var(--google-blue);
+  --text-link-visited: #681DA8;        /* Google search link visited */
+
+  /* Surfaces */
+  --surface: var(--white);
+  --surface-variant: var(--grey-50);
+  --surface-card: var(--white);
+  --surface-sunken: var(--grey-100);
+  --surface-scrim: rgba(32, 33, 36, 0.6); /* dialog backdrop */
+
+  /* Borders & dividers */
+  --border: var(--grey-300);
+  --border-strong: var(--grey-400);
+  --divider: var(--grey-200);
+
+  /* Interactive — primary action (Google Blue) */
+  --action-primary: var(--google-blue);
+  --action-primary-hover: #1B66C9;     /* blue darkened ~ hover  */
+  --action-primary-press: var(--google-blue-dark);
+  --action-primary-tint: var(--google-blue-light);
+
+  /* State layers (overlay opacities on top of a base color) */
+  --state-hover: rgba(60, 64, 67, 0.08);
+  --state-focus: rgba(60, 64, 67, 0.12);
+  --state-press: rgba(60, 64, 67, 0.16);
+  --state-hover-on-color: rgba(255, 255, 255, 0.16);
+
+  /* Focus ring */
+  --focus-ring: rgba(66, 133, 244, 0.4);
+
+  /* Semantic status */
+  --status-error: var(--google-red);
+  --status-error-dark: var(--google-red-dark);
+  --status-success: var(--google-green);
+  --status-success-dark: var(--google-green-dark);
+  --status-warning: var(--google-yellow-dark);
+  --status-info: var(--google-blue);
+}

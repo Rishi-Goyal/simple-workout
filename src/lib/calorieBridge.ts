@@ -82,6 +82,38 @@ async function putRecord(record: {
   });
 }
 
+/**
+ * v2 sessions publish the same record shape. Ids are offset so they can never
+ * collide with (and overwrite) v1 workout records already in the store.
+ */
+const V2_ID_OFFSET = 1_000_000;
+
+export async function publishSessionToBridge(session: {
+  id: number;
+  date: string;
+  started_at: string | null;
+  finished_at: string | null;
+}): Promise<void> {
+  try {
+    if (!session.finished_at) return;
+    const endedAt = new Date(session.finished_at).getTime();
+    let minutes = FALLBACK_MINUTES;
+    if (session.started_at) {
+      const elapsed = Math.round((endedAt - new Date(session.started_at).getTime()) / 60000);
+      if (elapsed >= 5 && elapsed <= 300) minutes = elapsed;
+    }
+    await putRecord({
+      id: V2_ID_OFFSET + session.id,
+      date: session.date,
+      endedAt,
+      type: "strength",
+      minutes
+    });
+  } catch {
+    // never let bridge issues surface in the workout flow
+  }
+}
+
 export async function publishWorkoutToBridge(workoutId: number): Promise<void> {
   try {
     const workout = getWorkout(workoutId);

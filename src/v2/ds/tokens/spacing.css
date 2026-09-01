@@ -1,0 +1,32 @@
+/* ============================================================
+   Google — Spacing tokens
+   Built on a 4px base grid (8px is the primary rhythm unit),
+   consistent with Material Design layout guidance.
+   ============================================================ */
+
+:root {
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* Semantic spacing */
+  --gap-inline: var(--space-2);   /* between inline items (icon+label) */
+  --gap-stack: var(--space-4);    /* between stacked blocks            */
+  --padding-card: var(--space-6); /* default card padding              */
+  --padding-control: var(--space-3); /* inner control padding          */
+
+  /* Layout */
+  --container-max: 1200px;
+  --content-max: 720px;  /* constrained copy width — "force line breaks" per brand guide */
+  --touch-target-min: 48px; /* minimum hit target */
+}

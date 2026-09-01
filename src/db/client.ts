@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { SCHEMA_SQL } from "./schema";
+import { SCHEMA_V2_SQL } from "./schemaV2";
 import { SEED_EXERCISES } from "./seed";
 import { SEED_WARMUPS } from "./warmupSeed";
 
@@ -47,6 +48,7 @@ async function initDb(): Promise<void> {
   // FKs are off by default in SQLite; required for the ON DELETE CASCADEs.
   db!.exec("PRAGMA foreign_keys = ON;");
   db!.exec(SCHEMA_SQL);
+  db!.exec(SCHEMA_V2_SQL);
   migrate();
   seedIfEmpty();
   seedWarmupsIfEmpty();
