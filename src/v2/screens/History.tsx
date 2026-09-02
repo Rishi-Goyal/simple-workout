@@ -58,7 +58,7 @@ export function HistoryV2() {
 
         {entries.length > 0 ? (
           <>
-            <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
+            <div className="anim-fade-up" style={{ marginTop: 24, display: "flex", gap: 12 }}>
               {[
                 { big: entries.length, label: entries.length === 1 ? "workout" : "workouts" },
                 { big: best, label: "best streak" },
@@ -72,7 +72,7 @@ export function HistoryV2() {
             </div>
 
             {groups.map((g) => (
-              <div key={g.title}>
+              <div key={g.title} className="anim-fade-up anim-d1">
                 <SectionLabel style={{ marginTop: 28 }}>{g.title}</SectionLabel>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {g.items.map((h) => (
@@ -111,7 +111,7 @@ export function HistoryV2() {
             <div style={{ height: 24 }} />
           </>
         ) : (
-          <div style={{ marginTop: 120, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12 }}>
+          <div className="anim-fade-up" style={{ marginTop: 120, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12 }}>
             <Icon name="history" size={48} color="var(--color-grey-400)" />
             <div style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>Nothing here yet</div>
             <div style={{ fontSize: 16, lineHeight: "24px", color: "var(--color-grey-700)", maxWidth: 260 }}>

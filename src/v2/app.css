@@ -3,6 +3,10 @@
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
+  transition: transform 0.12s ease;
+}
+.tap:active {
+  transform: scale(0.97);
 }
 .ring {
   transition: stroke-dashoffset 0.9s linear;
@@ -10,4 +14,83 @@
 button.tap {
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* ---- Motion: subtle & swift -------------------------------------------- */
+
+/* Screen cross-fade (View Transitions API). The old screen fades out a touch
+   faster than the new one fades in, so there's no muddy overlap. */
+::view-transition-old(root) {
+  animation-duration: 0.16s;
+  animation-timing-function: ease-in;
+}
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-timing-function: ease-out;
+}
+
+@keyframes v2-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes v2-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes v2-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.anim-fade-up {
+  animation: v2-fade-up 0.24s ease-out both;
+}
+.anim-pop {
+  animation: v2-pop-in 0.18s ease-out both;
+}
+.anim-grow {
+  transform-origin: left center;
+  animation: v2-grow-x 0.4s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Small stagger for header -> content -> footer rhythm. */
+.anim-d1 {
+  animation-delay: 0.04s;
+}
+.anim-d2 {
+  animation-delay: 0.08s;
+}
+.anim-d3 {
+  animation-delay: 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tap,
+  .ring,
+  .anim-fade-up,
+  .anim-pop,
+  .anim-grow {
+    animation: none !important;
+    transition: none !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
 }

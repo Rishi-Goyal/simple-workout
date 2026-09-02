@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { EQUIP_TIER_LABELS, type EquipTier } from "../engine";
 import { setPref } from "../queries";
+import { viewTransition } from "../motion";
 import { Icon, Pill } from "../ui";
 
 const OPTIONS: { tier: EquipTier; sub: string; icon: string }[] = [
@@ -13,9 +14,11 @@ export function OnboardV2({ onDone }: { onDone: () => void }) {
   const [tier, setTier] = useState<EquipTier>("nothing");
 
   function finish() {
-    setPref("equipment", tier);
-    setPref("onboarded", "1");
-    onDone();
+    viewTransition(() => {
+      setPref("equipment", tier);
+      setPref("onboarded", "1");
+      onDone();
+    });
   }
 
   return (
@@ -45,8 +48,10 @@ export function OnboardV2({ onDone }: { onDone: () => void }) {
                 gap: 16,
                 padding: "16px 20px",
                 borderRadius: 16,
-                border: on ? "2px solid var(--color-blue-600)" : "1px solid var(--color-grey-300)",
+                // constant-width border so the card doesn't jump on select
+                border: on ? "2px solid var(--color-blue-600)" : "2px solid var(--color-grey-300)",
                 background: on ? "var(--color-blue-50)" : "#fff",
+                transition: "border-color .2s, background .2s",
                 cursor: "pointer"
               }}
             >

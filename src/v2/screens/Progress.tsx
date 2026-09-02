@@ -15,10 +15,10 @@ export function ProgressV2() {
         <div style={{ height: 48, display: "flex", alignItems: "center" }}>
           <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 500 }}>Progress</span>
         </div>
-        <div style={{ marginTop: 16, fontSize: 16, lineHeight: "24px", color: "var(--color-grey-700)" }}>
+        <div className="anim-fade-up" style={{ marginTop: 16, fontSize: 16, lineHeight: "24px", color: "var(--color-grey-700)" }}>
           Each movement is a ladder. You climb a rung when you hit the top of the rep range twice.
         </div>
-        <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="anim-fade-up anim-d1" style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
           {LADDERS.map((L) => {
             const rung = levels[L.pattern];
             const total = maxRung(L.pattern);
@@ -60,10 +60,13 @@ export function ProgressV2() {
                   {Array.from({ length: total }, (_, i) => (
                     <span
                       key={i}
+                      className={i < rung ? "anim-grow" : undefined}
                       style={{
                         flex: 1,
                         height: 8,
                         borderRadius: 4,
+                        // filled segments sweep in left-to-right
+                        animationDelay: i < rung ? `${0.08 + i * 0.05}s` : undefined,
                         background:
                           i < rung
                             ? isNew && i === rung - 1

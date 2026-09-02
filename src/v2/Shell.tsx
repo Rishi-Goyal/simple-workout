@@ -26,7 +26,19 @@ export function ShellV2() {
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", background: "var(--color-grey-100)" }}>
       {!dbIsPersistent() && (
-        <div style={{ width: "100%", background: "var(--color-yellow-50)", color: "var(--color-yellow-900)", padding: "8px 16px", textAlign: "center", fontSize: 12, flexShrink: 0 }}>
+        <div
+          style={{
+            width: "100%",
+            background: "var(--color-yellow-50)",
+            color: "var(--color-yellow-900)",
+            padding: "8px 16px",
+            textAlign: "center",
+            fontSize: 12,
+            flexShrink: 0,
+            // pinned out of the route cross-fade
+            viewTransitionName: "storage-banner"
+          } as import("react").CSSProperties}
+        >
           Storage unavailable in this browser — data will be lost when you close or reload this page.
         </div>
       )}
