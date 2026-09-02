@@ -14,6 +14,7 @@ import {
   unfinishedSession
 } from "../queries";
 import { useV2Session } from "../sessionStore";
+import { viewTransition } from "../motion";
 import { HomeNav, Icon, Pill } from "../ui";
 import { InstallPrompt } from "../../components/InstallPrompt";
 
@@ -41,23 +42,27 @@ export function HomeV2() {
   function start() {
     if (unfinished) discardSession(unfinished.id);
     const id = createSession(day, plan.map((p) => p.exercise.id));
-    session.begin(id, warmupFirst);
-    navigate("/session");
+    viewTransition(() => {
+      session.begin(id, warmupFirst);
+      navigate("/session");
+    });
   }
 
   function resume() {
     if (!unfinished) return;
-    if (session.sessionId !== unfinished.id) {
-      // Session was started elsewhere (or local state lost) — resume at the
-      // first exercise that still has sets missing.
-      const items = sessionItems(unfinished.id);
-      session.begin(unfinished.id, false);
-      const idx = items.findIndex((i) => i.outcome === "pending");
-      session.setExIdx(Math.max(0, idx));
-    } else {
-      session.setPhase(session.phase === "rest" ? "rest" : "exercise");
-    }
-    navigate("/session");
+    viewTransition(() => {
+      if (session.sessionId !== unfinished.id) {
+        // Session was started elsewhere (or local state lost) — resume at the
+        // first exercise that still has sets missing.
+        const items = sessionItems(unfinished.id);
+        session.begin(unfinished.id, false);
+        const idx = items.findIndex((i) => i.outcome === "pending");
+        session.setExIdx(Math.max(0, idx));
+      } else {
+        session.setPhase(session.phase === "rest" ? "rest" : "exercise");
+      }
+      navigate("/session");
+    });
   }
 
   function discard() {
@@ -90,6 +95,7 @@ export function HomeV2() {
         <InstallPrompt />
 
         <div
+          className="anim-fade-up"
           style={{
             marginTop: 48,
             display: "inline-flex",
@@ -109,12 +115,12 @@ export function HomeV2() {
           {streak > 0 ? `${streak} in a row` : "First workout"}
         </div>
 
-        <div style={{ marginTop: 20, fontFamily: "var(--font-display)", fontSize: 64, lineHeight: "64px", fontWeight: 500, letterSpacing: -2 }}>
+        <div className="anim-fade-up anim-d1" style={{ marginTop: 20, fontFamily: "var(--font-display)", fontSize: 64, lineHeight: "64px", fontWeight: 500, letterSpacing: -2 }}>
           {dayWord}
           <br />
           day.
         </div>
-        <div style={{ marginTop: 16, fontSize: 18, lineHeight: "26px", color: "rgba(255,255,255,.9)", maxWidth: 300 }}>
+        <div className="anim-fade-up anim-d2" style={{ marginTop: 16, fontSize: 18, lineHeight: "26px", color: "rgba(255,255,255,.9)", maxWidth: 300 }}>
           {firstEver
             ? "Three easy exercises to find your level. About 25 minutes."
             : `Three exercises. About ${day === "legs" ? 40 : 35} minutes. Everything’s picked.`}
@@ -151,7 +157,7 @@ export function HomeV2() {
           </div>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 24, fontSize: 15, lineHeight: "22px", color: "rgba(255,255,255,.9)" }}>
+        <div className="anim-fade-up anim-d2" style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 24, fontSize: 15, lineHeight: "22px", color: "rgba(255,255,255,.9)" }}>
           {plan.map((p) => (
             <div key={p.pattern} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.exercise.name}</span>
@@ -162,7 +168,7 @@ export function HomeV2() {
           ))}
         </div>
 
-        <Pill onClick={start} background="#fff" color="var(--color-blue-700)" height={64} fontSize={18}>
+        <Pill onClick={start} background="#fff" color="var(--color-blue-700)" height={64} fontSize={18} style={{ animation: "v2-fade-up .24s ease-out .12s both" }}>
           <Icon name="play_arrow" size={26} fill />
           {unfinished ? "Start over" : "Start"}
         </Pill>

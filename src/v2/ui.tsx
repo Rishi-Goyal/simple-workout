@@ -5,6 +5,10 @@
  */
 import { useNavigate } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
+import { viewTransition } from "./motion";
+
+/** Keeps the bottom bar visually pinned while screens cross-fade under it. */
+const NAV_TRANSITION_NAME = { viewTransitionName: "bottom-nav" } as CSSProperties;
 
 export function Icon({ name, size = 24, fill = false, color, style }: {
   name: string;
@@ -146,7 +150,8 @@ export function LightNav({ active }: { active: string }) {
         paddingTop: 12,
         background: "var(--color-grey-50)",
         borderTop: "1px solid var(--color-grey-200)",
-        flexShrink: 0
+        flexShrink: 0,
+        ...NAV_TRANSITION_NAME
       }}
     >
       {NAV_ITEMS.map((n) => {
@@ -155,7 +160,7 @@ export function LightNav({ active }: { active: string }) {
           <div
             key={n.path}
             className="tap"
-            onClick={() => navigate(n.path)}
+            onClick={() => viewTransition(() => navigate(n.path))}
             style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer" }}
           >
             <span
@@ -164,14 +169,28 @@ export function LightNav({ active }: { active: string }) {
                 height: 32,
                 borderRadius: 16,
                 background: on ? "var(--color-blue-100)" : "transparent",
+                transition: "background .25s",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center"
               }}
             >
-              <Icon name={n.icon} size={24} fill={on} color={on ? "var(--color-blue-800)" : "var(--color-grey-700)"} />
+              <Icon
+                name={n.icon}
+                size={24}
+                fill={on}
+                color={on ? "var(--color-blue-800)" : "var(--color-grey-700)"}
+                style={{ transition: "color .25s" }}
+              />
             </span>
-            <span style={{ fontSize: 12, fontWeight: 500, color: on ? "var(--color-grey-900)" : "var(--color-grey-700)" }}>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: on ? "var(--color-grey-900)" : "var(--color-grey-700)",
+                transition: "color .25s"
+              }}
+            >
               {n.label}
             </span>
           </div>
@@ -192,7 +211,8 @@ export function HomeNav() {
         display: "flex",
         alignItems: "flex-start",
         paddingTop: 12,
-        background: "rgba(0,0,0,.18)"
+        background: "rgba(0,0,0,.18)",
+        ...NAV_TRANSITION_NAME
       }}
     >
       {NAV_ITEMS.map((n) => {
@@ -201,7 +221,7 @@ export function HomeNav() {
           <div
             key={n.path}
             className="tap"
-            onClick={() => navigate(n.path)}
+            onClick={() => viewTransition(() => navigate(n.path))}
             style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer" }}
           >
             <span

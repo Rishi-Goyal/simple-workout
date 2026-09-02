@@ -32,6 +32,7 @@ import {
   streaks
 } from "../queries";
 import { useV2Session } from "../sessionStore";
+import { viewTransition } from "../motion";
 import { Icon, Pill } from "../ui";
 
 function mmss(sec: number): string {
@@ -90,18 +91,18 @@ function WarmupStep() {
         <span
           className="tap"
           style={{ fontSize: 14, fontWeight: 500, color: "var(--color-blue-600)", padding: "8px 4px", cursor: "pointer" }}
-          onClick={() => { st.clear(); navigate("/"); }}
+          onClick={() => viewTransition(() => { st.clear(); navigate("/"); })}
         >
           Exit
         </span>
       </div>
-      <div style={{ marginTop: 12, fontFamily: "var(--font-display)", fontSize: 32, lineHeight: "40px" }}>
+      <div className="anim-fade-up" style={{ marginTop: 12, fontFamily: "var(--font-display)", fontSize: 32, lineHeight: "40px" }}>
         Loosen up first.
       </div>
       <div style={{ marginTop: 4, fontSize: 16, lineHeight: "24px", color: "var(--color-grey-700)" }}>
         Two easy moves. No timer — just until things feel loose.
       </div>
-      <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="anim-fade-up anim-d1" style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
         {moves.map((w) => (
           <div key={w.id} style={{ border: "1px solid var(--color-grey-300)", borderRadius: 16, padding: "16px 20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
@@ -117,7 +118,13 @@ function WarmupStep() {
         ))}
       </div>
       <div style={{ flex: 1, minHeight: 24 }} />
-      <Pill onClick={() => st.setPhase("exercise")} background="var(--color-blue-600)" color="#fff" height={64} fontSize={18}>
+      <Pill
+        onClick={() => viewTransition(() => st.setPhase("exercise"))}
+        background="var(--color-blue-600)"
+        color="#fff"
+        height={64}
+        fontSize={18}
+      >
         <Icon name="check" size={26} />
         Warmed up — start
       </Pill>
@@ -152,16 +159,18 @@ function ExerciseStep() {
     if (willBeDone) {
       setItemOutcome(sessionId, exIdx, item.outcome === "swapped_down" ? "swapped_down" : "done");
     } else {
-      st.startRest(Number(getPref("rest_seconds")) || 90);
+      viewTransition(() => st.startRest(Number(getPref("rest_seconds")) || 90));
     }
   }
 
   function advance() {
-    if (last) {
-      st.setPhase("finish");
-    } else {
-      st.setExIdx(exIdx + 1);
-    }
+    viewTransition(() => {
+      if (last) {
+        st.setPhase("finish");
+      } else {
+        st.setExIdx(exIdx + 1);
+      }
+    });
   }
 
   function skip() {
@@ -189,7 +198,8 @@ function ExerciseStep() {
                 height: 6,
                 borderRadius: 3,
                 width: i === exIdx ? 28 : 8,
-                background: i < exIdx ? "var(--color-green-500)" : i === exIdx ? "var(--color-blue-600)" : "var(--color-grey-300)"
+                background: i < exIdx ? "var(--color-green-500)" : i === exIdx ? "var(--color-blue-600)" : "var(--color-grey-300)",
+                transition: "width .25s, background .25s"
               }}
             />
           ))}
@@ -204,7 +214,7 @@ function ExerciseStep() {
           <span
             className="tap"
             style={{ fontSize: 14, fontWeight: 500, color: "var(--color-blue-600)", padding: "8px 4px", cursor: "pointer" }}
-            onClick={() => navigate("/")}
+            onClick={() => viewTransition(() => navigate("/"))}
           >
             Exit
           </span>
@@ -254,6 +264,7 @@ function ExerciseStep() {
         {sets.map((s, i) => (
           <span
             key={i}
+            className="anim-pop"
             style={{
               height: 32,
               padding: "0 12px",
@@ -276,7 +287,7 @@ function ExerciseStep() {
       <div style={{ flex: 1, minHeight: 16 }} />
 
       {done ? (
-        <div style={{ borderRadius: 16, background: "var(--color-green-50)", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <div className="anim-fade-up" style={{ borderRadius: 16, background: "var(--color-green-50)", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <Icon name="task_alt" size={28} fill color="var(--color-green-700)" />
           <div style={{ flex: 1, fontSize: 16 }}>All {ex.target.sets} sets done.</div>
           <Pill onClick={advance} background="var(--color-green-700)" color="#fff" height={40} fontSize={14} style={{ width: "auto", padding: "0 20px", whiteSpace: "nowrap" }}>
@@ -342,7 +353,7 @@ function ExerciseStep() {
         </span>
       </div>
       {st.howToOpen && (
-        <ol style={{ margin: "12px 0 0", padding: "0 0 0 20px", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-800)", display: "flex", flexDirection: "column", gap: 4 }}>
+        <ol className="anim-fade-up" style={{ margin: "12px 0 0", padding: "0 0 0 20px", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-800)", display: "flex", flexDirection: "column", gap: 4 }}>
           {ex.howTo.map((h, i) => (
             <li key={i}>{h}</li>
           ))}
@@ -377,7 +388,7 @@ function RestStep() {
   useEffect(() => {
     if (left <= 0) {
       if (getPref("vibrate") === "1" && "vibrate" in navigator) navigator.vibrate?.([200, 100, 200]);
-      st.setPhase("exercise");
+      viewTransition(() => st.setPhase("exercise"));
     }
   }, [left <= 0]);
 
@@ -392,13 +403,13 @@ function RestStep() {
         <span
           className="tap"
           style={{ fontSize: 14, fontWeight: 500, color: "var(--color-blue-300)", padding: "8px 4px", cursor: "pointer" }}
-          onClick={() => navigate("/")}
+          onClick={() => viewTransition(() => navigate("/"))}
         >
           Exit
         </span>
       </div>
-      <div style={{ marginTop: 48, fontSize: 16, letterSpacing: 0.5, color: "var(--color-grey-400)" }}>Rest</div>
-      <div style={{ position: "relative", width: 280, height: 280, marginTop: 24, flexShrink: 0 }}>
+      <div className="anim-fade-up" style={{ marginTop: 48, fontSize: 16, letterSpacing: 0.5, color: "var(--color-grey-400)" }}>Rest</div>
+      <div className="anim-fade-up anim-d1" style={{ position: "relative", width: 280, height: 280, marginTop: 24, flexShrink: 0 }}>
         <svg viewBox="0 0 280 280" width="280" height="280" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
           <circle cx="140" cy="140" r="128" fill="none" stroke="#3C4043" strokeWidth="10" />
           <circle
@@ -428,7 +439,7 @@ function RestStep() {
         <Pill onClick={() => st.addRest(30)} background="transparent" color="#fff" border="1px solid var(--color-grey-600)" flex={1}>
           +30 s
         </Pill>
-        <Pill onClick={() => st.setPhase("exercise")} background="#fff" color="var(--color-grey-900)" flex={2} gap={8}>
+        <Pill onClick={() => viewTransition(() => st.setPhase("exercise"))} background="#fff" color="var(--color-grey-900)" flex={2} gap={8}>
           <Icon name="skip_next" size={22} />
           Skip — go now
         </Pill>
@@ -500,26 +511,28 @@ function FinishStep() {
   const mins = session.duration_min ?? 1;
 
   function goHome() {
-    st.clear();
-    navigate("/");
+    viewTransition(() => {
+      st.clear();
+      navigate("/");
+    });
   }
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "16px 24px 24px", overflowY: "auto" }}>
       <div style={{ height: 48, flexShrink: 0 }} />
-      <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--color-green-50)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <div className="anim-pop" style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--color-green-50)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <Icon name="check" size={40} fill color="var(--color-green-700)" />
       </div>
-      <div style={{ marginTop: 24, fontFamily: "var(--font-display)", fontSize: 36, lineHeight: "44px" }}>
+      <div className="anim-fade-up anim-d1" style={{ marginTop: 24, fontFamily: "var(--font-display)", fontSize: 36, lineHeight: "44px" }}>
         Done.
         <br />
         {mins} minute{mins === 1 ? "" : "s"}.
       </div>
-      <div style={{ marginTop: 8, fontSize: 16, lineHeight: "24px", color: "var(--color-grey-700)" }}>
+      <div className="anim-fade-up anim-d1" style={{ marginTop: 8, fontSize: 16, lineHeight: "24px", color: "var(--color-grey-700)" }}>
         {dayWord} day · {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
       </div>
 
-      <div style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderRadius: 16, background: "var(--color-yellow-50)" }}>
+      <div className="anim-fade-up anim-d2" style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderRadius: 16, background: "var(--color-yellow-50)" }}>
         <Icon name="local_fire_department" size={28} fill color="var(--color-yellow-700)" />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 16, fontWeight: 500 }}>{streak <= 1 ? "First one done" : `${streak} in a row`}</div>
@@ -532,7 +545,7 @@ function FinishStep() {
       </div>
 
       {levelUps.map((lu) => (
-        <div key={lu.pattern} style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderRadius: 16, background: "var(--color-green-50)" }}>
+        <div key={lu.pattern} className="anim-fade-up anim-d2" style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderRadius: 16, background: "var(--color-green-50)" }}>
           <Icon name="arrow_upward" size={28} color="var(--color-green-700)" />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 16, fontWeight: 500 }}>
@@ -543,7 +556,7 @@ function FinishStep() {
         </div>
       ))}
 
-      <div style={{ marginTop: 24, display: "flex", flexDirection: "column" }}>
+      <div className="anim-fade-up anim-d3" style={{ marginTop: 24, display: "flex", flexDirection: "column" }}>
         {items.map((item) => {
           const ex = getExerciseV2(item.exercise_id)!;
           const sets = setsFor(sessionId, ex.id);

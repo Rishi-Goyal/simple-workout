@@ -94,6 +94,7 @@ export function SettingsV2() {
           <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 500 }}>Settings</span>
         </div>
 
+        <div className="anim-fade-up">
         <SectionLabel style={{ marginTop: 24 }}>I have</SectionLabel>
         <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
           {(Object.keys(EQUIP_TIER_LABELS) as EquipTier[]).map((t) => (
@@ -203,6 +204,7 @@ export function SettingsV2() {
         <SectionLabel style={{ marginTop: 28 }}>About</SectionLabel>
         <div style={{ padding: "14px 0 24px", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-700)" }}>
           Exercise photos from free-exercise-db (public domain). Simple Workout 2.0.
+        </div>
         </div>
       </div>
       <LightNav active="/settings" />
