@@ -1,0 +1,41 @@
+/* ============================================================
+   Google — Fonts
+   Roboto + Roboto Mono are Google's own typefaces, loaded from
+   Google Fonts. Material Symbols is the official Google icon set.
+
+   Display face: "Google Sans Flex", Google's variable marketing
+   typeface, now publicly available on Google Fonts and loaded here.
+   "Google Sans" (a.k.a. Product Sans) remains a proprietary fallback
+   that activates wherever a licensed copy is installed. Roboto is the
+   final display fallback and the body/UI face.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Roboto+Mono:wght@400;500&display=swap');
+
+/* Google Sans Flex — Google's variable display/marketing typeface (now public on Google Fonts) */
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&display=swap');
+
+/* Material Symbols — official Google icon font (variable axes) */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+
+/* Base icon class — Material Symbols Rounded (Google's modern default) */
+.material-symbols-rounded,
+.material-symbols-outlined {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.material-symbols-outlined { font-family: 'Material Symbols Outlined'; }
+.material-symbols-rounded.fill,
+.material-symbols-outlined.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }

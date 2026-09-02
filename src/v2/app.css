@@ -1,0 +1,13 @@
+/* v2 app-level styles carried over from the prototype's inline <style>. */
+.tap {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ring {
+  transition: stroke-dashoffset 0.9s linear;
+}
+button.tap {
+  -webkit-appearance: none;
+  appearance: none;
+}
