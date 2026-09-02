@@ -21,7 +21,9 @@ let db: DbHandle | null = null;
 let initPromise: Promise<void> | null = null;
 const readyListeners = new Set<() => void>();
 let ready = false;
-let persistent = false;
+
+export type StorageMode = "opfs" | "local" | "memory";
+let storageMode: StorageMode = "memory";
 
 function notifyReady() {
   ready = true;
@@ -34,15 +36,29 @@ async function initDb(): Promise<void> {
     printErr: console.error
   });
 
-  // Prefer OPFS SAH Pool VFS — works without COOP/COEP headers.
+  // Storage fallback chain:
+  // 1. OPFS SAH Pool VFS — the ideal, but FileSystemSyncAccessHandle only
+  //    exists in Worker threads, and this DB runs on the main thread, so it
+  //    fails everywhere today. Kept first for a future move into a worker.
+  // 2. kvvfs ("local") — SQLite's localStorage-backed VFS, built exactly for
+  //    main-thread use. Persistent in every browser that has localStorage;
+  //    plenty of quota for this app's few hundred KB of rows.
+  // 3. In-memory — last resort; the shell shows a data-loss banner.
   try {
     const pool = await sqlite3.installOpfsSAHPoolVfs({ name: "workout-pool" });
     db = new pool.OpfsSAHPoolDb("/workout.db") as DbHandle;
-    persistent = true;
+    storageMode = "opfs";
     console.info("[db] using OPFS SAH Pool VFS");
-  } catch (err) {
-    console.warn("[db] OPFS unavailable, using in-memory DB", err);
-    db = new sqlite3.oo1.DB(":memory:", "c") as DbHandle;
+  } catch (opfsErr) {
+    try {
+      db = new sqlite3.oo1.JsStorageDb("local") as DbHandle;
+      storageMode = "local";
+      console.info("[db] OPFS unavailable, using localStorage VFS (kvvfs)", opfsErr);
+    } catch (kvErr) {
+      console.warn("[db] no persistent storage available, using in-memory DB", opfsErr, kvErr);
+      db = new sqlite3.oo1.DB(":memory:", "c") as DbHandle;
+      storageMode = "memory";
+    }
   }
 
   // FKs are off by default in SQLite; required for the ON DELETE CASCADEs.
@@ -165,10 +181,15 @@ export function lastInsertId(): number {
   return Number(r?.id ?? 0);
 }
 
-// True when the DB is backed by OPFS; false means the in-memory fallback
-// is active and nothing survives a reload. Stable once the DB is ready.
+// True when the DB is backed by durable storage (OPFS or localStorage);
+// false means the in-memory fallback is active and nothing survives a
+// reload. Stable once the DB is ready.
 export function dbIsPersistent(): boolean {
-  return persistent;
+  return storageMode !== "memory";
+}
+
+export function dbStorageMode(): StorageMode {
+  return storageMode;
 }
 
 // ---------- react hook ----------

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { useDbVersion } from "../../db/client";
+import { dbStorageMode, useDbVersion } from "../../db/client";
 import { exportBackup, importBackup } from "../../db/backup";
 import {
   downloadLatestBackup,
@@ -204,6 +204,9 @@ export function SettingsV2() {
         <SectionLabel style={{ marginTop: 28 }}>About</SectionLabel>
         <div style={{ padding: "14px 0 24px", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-700)" }}>
           Exercise photos from free-exercise-db (public domain). Simple Workout 2.0.
+          <br />
+          Storage:{" "}
+          {{ opfs: "on-device file (OPFS)", local: "on-device (localStorage)", memory: "in-memory — not persistent" }[dbStorageMode()]}
         </div>
         </div>
       </div>
