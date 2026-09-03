@@ -99,7 +99,8 @@ export default {
         } catch {
           return json({ error: "invalid JSON" }, 400, cors);
         }
-        if (body.version !== 1 || typeof body.tables !== "object" || body.tables === null) {
+        // v1 payloads have the original 7 tables; v2 adds the v2_* tables.
+        if ((body.version !== 1 && body.version !== 2) || typeof body.tables !== "object" || body.tables === null) {
           return json({ error: "unsupported backup format" }, 400, cors);
         }
 
