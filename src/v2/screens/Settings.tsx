@@ -206,7 +206,12 @@ export function SettingsV2() {
           Exercise photos from free-exercise-db (public domain). Simple Workout 2.0.
           <br />
           Storage:{" "}
-          {{ opfs: "on-device file (OPFS)", local: "on-device (localStorage)", memory: "in-memory — not persistent" }[dbStorageMode()]}
+          {{
+            opfs: "on-device file (OPFS)",
+            idb: "on-device (IndexedDB)",
+            local: "on-device (localStorage)",
+            memory: "in-memory — not persistent"
+          }[dbStorageMode()]}
         </div>
         </div>
       </div>
