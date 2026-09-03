@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { dbStorageMode, useDbVersion } from "../../db/client";
+import { checkForUpdates } from "../../lib/appUpdate";
 import { exportBackup, importBackup } from "../../db/backup";
 import {
   downloadLatestBackup,
@@ -38,6 +39,24 @@ export function SettingsV2() {
   const [message, setMessage] = useState<string | null>(null);
 
   const lastBackup = getLastBackupAt();
+  const [updateState, setUpdateState] = useState<"idle" | "checking" | "reloading" | "up-to-date" | "failed" | "unavailable">("idle");
+
+  async function onCheckUpdates() {
+    if (updateState === "checking" || updateState === "reloading") return;
+    setUpdateState("checking");
+    const result = await checkForUpdates();
+    setUpdateState(result === "reloading" ? "reloading" : result);
+    // "reloading" resolves itself when the new worker takes over.
+  }
+
+  const updateTitle = {
+    idle: "Check for updates",
+    checking: "Checking…",
+    reloading: "Updating — reloading in a moment…",
+    "up-to-date": "You're on the latest version",
+    failed: "Couldn't check — are you online?",
+    unavailable: "Updates apply automatically here"
+  }[updateState];
 
   async function backupNow() {
     setBusy("backup");
@@ -200,6 +219,23 @@ export function SettingsV2() {
           <Icon name="chevron_right" size={24} color="var(--color-grey-500)" />
         </Row>
         {message && <div style={{ padding: "10px 0", fontSize: 14, color: "var(--color-grey-700)" }}>{message}</div>}
+
+        <SectionLabel style={{ marginTop: 28 }}>App</SectionLabel>
+        <Row>
+          <Icon
+            name={updateState === "up-to-date" ? "check_circle" : "system_update"}
+            size={24}
+            color={updateState === "up-to-date" ? "var(--color-green-700)" : "var(--color-grey-700)"}
+          />
+          <div className="tap" style={{ flex: 1, cursor: "pointer" }} onClick={onCheckUpdates}>
+            <div style={{ fontSize: 16 }}>{updateTitle}</div>
+            <div style={{ fontSize: 14, color: "var(--color-grey-700)" }}>
+              Version {__APP_VERSION__} · built{" "}
+              {new Date(__BUILD_TIME__).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </div>
+          </div>
+          <Icon name="refresh" size={24} color="var(--color-grey-500)" />
+        </Row>
 
         <SectionLabel style={{ marginTop: 28 }}>About</SectionLabel>
         <div style={{ padding: "14px 0 24px", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-700)" }}>
