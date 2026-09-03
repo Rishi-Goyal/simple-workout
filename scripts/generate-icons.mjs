@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 const svg = await readFile(new URL("../public/favicon.svg", import.meta.url));
 const out = (name) => new URL(`../public/${name}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 
-const BG = "#0f172a";
+const BG = "#1A73E8";
 
 async function plain(size, name) {
   await sharp(svg, { density: 72 * (size / 64) })
