@@ -344,6 +344,14 @@ export function dbLastSavedAt(): string | null {
   return lastSavedAt;
 }
 
+/** Write any pending snapshot now (e.g. right before a deliberate reload). */
+export async function flushDb(): Promise<void> {
+  if (persistTimer != null) {
+    clearTimeout(persistTimer);
+    await persistNow();
+  }
+}
+
 // ---------- react hook ----------
 
 export function useDbReady(): boolean {
