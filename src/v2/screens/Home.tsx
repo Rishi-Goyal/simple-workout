@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useDbVersion } from "../../db/client";
-import { nextDay, planFor, targetLabel } from "../engine";
+import { equipmentList, nextDay, planFor, targetLabel, unavailablePatterns } from "../engine";
 import {
   createSession,
   discardSession,
@@ -32,6 +32,8 @@ export function HomeV2() {
   const last = lastFinishedSession();
   const day = session.dayOverride ?? nextDay(last?.day_type ?? null);
   const plan = planFor(day, levels, tier);
+  const unavailable = unavailablePatterns(day, tier);
+  const countWord = ["Zero", "One", "Two", "Three", "Four"][plan.length] ?? String(plan.length);
   const { current: streak } = streaks();
   const firstEver = !last;
   const unfinished = unfinishedSession();
@@ -122,8 +124,8 @@ export function HomeV2() {
         </div>
         <div className="anim-fade-up anim-d2" style={{ marginTop: 16, fontSize: 18, lineHeight: "26px", color: "rgba(255,255,255,.9)", maxWidth: 300 }}>
           {firstEver
-            ? "Three easy exercises to find your level. About 25 minutes."
-            : `Three exercises. About ${day === "legs" ? 40 : 35} minutes. Everything’s picked.`}
+            ? `${countWord} easy exercise${plan.length === 1 ? "" : "s"} to find your level. About ${plan.length < 3 ? 20 : 25} minutes.`
+            : `${countWord} exercise${plan.length === 1 ? "" : "s"}. About ${(day === "legs" ? 40 : 35) - (3 - plan.length) * 10} minutes. Everything’s picked.`}
         </div>
 
         <div style={{ flex: 1, minHeight: 24 }} />
@@ -164,6 +166,12 @@ export function HomeV2() {
               <span style={{ color: "rgba(255,255,255,.7)", whiteSpace: "nowrap" }}>
                 {targetLabel(p.exercise.target)}
               </span>
+            </div>
+          ))}
+          {unavailable.map((u) => (
+            <div key={u.pattern} style={{ display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255,255,255,.6)" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.label}</span>
+              <span style={{ whiteSpace: "nowrap" }}>needs {equipmentList(u.missing)}</span>
             </div>
           ))}
         </div>

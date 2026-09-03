@@ -1,12 +1,13 @@
 import { useDbVersion } from "../../db/client";
 import { LADDERS } from "../ladders";
-import { maxRung } from "../engine";
-import { getLevels, recentPromotions } from "../queries";
+import { equipmentList, maxRung, missingEquipment, resolveExercise } from "../engine";
+import { getEquipTier, getLevels, recentPromotions } from "../queries";
 import { Icon, LightNav, SectionLabel } from "../ui";
 
 export function ProgressV2() {
   useDbVersion();
   const levels = getLevels();
+  const tier = getEquipTier();
   const promoted = recentPromotions();
 
   return (
@@ -22,9 +23,25 @@ export function ProgressV2() {
           {LADDERS.map((L) => {
             const rung = levels[L.pattern];
             const total = maxRung(L.pattern);
-            const current = L.rungs.find((r) => r.rung === rung && r.canonical) ?? L.rungs.find((r) => r.rung === rung);
-            const next = L.rungs.find((r) => r.rung === rung + 1 && r.canonical) ?? L.rungs.find((r) => r.rung === rung + 1);
+            // What the user actually does today (may sit below the stored rung
+            // when equipment blocks it), and what the next rung would need.
+            const current = resolveExercise(L.pattern, rung, tier);
+            // "Next" is the rung just above what the user actually does — when
+            // equipment holds them below the stored rung, that is the honest
+            // next step (and what it needs).
+            const nextRung = current ? current.rung + 1 : 1;
+            const nextCanonical = L.rungs.find((r) => r.rung === nextRung && r.canonical) ?? L.rungs.find((r) => r.rung === nextRung);
+            const nextUsable = nextCanonical ? resolveExercise(L.pattern, nextRung, tier) : undefined;
+            const nextDoable = nextUsable && nextUsable.rung === nextRung ? nextUsable : undefined;
             const isNew = promoted.has(L.pattern);
+            const topRung = current && current.rung === total;
+            const nextLine = nextDoable
+              ? `Next: ${nextDoable.name}`
+              : nextCanonical
+                ? `Next: ${nextCanonical.name} — needs ${equipmentList(missingEquipment(nextCanonical, tier))}`
+                : topRung && current?.graduate.kind === "maintain"
+                  ? "Top of the ladder"
+                  : "Top of the ladder — progress by weight";
             return (
               <div key={L.pattern} style={{ border: "1px solid var(--color-grey-300)", borderRadius: 16, padding: "16px 20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
@@ -34,7 +51,9 @@ export function ProgressV2() {
                   </span>
                 </div>
                 <div style={{ marginTop: 4, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontFamily: "var(--font-display)", fontSize: 22, lineHeight: "28px" }}>{current?.name}</span>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 22, lineHeight: "28px" }}>
+                    {current?.name ?? `Needs ${equipmentList(missingEquipment(L.rungs[0], tier))}`}
+                  </span>
                   {isNew && (
                     <span
                       style={{
@@ -78,7 +97,7 @@ export function ProgressV2() {
                   ))}
                 </div>
                 <div style={{ marginTop: 8, fontSize: 14, color: "var(--color-grey-700)" }}>
-                  {next ? `Next: ${next.name}` : "Top of the ladder — progress by weight"}
+                  {nextLine}
                 </div>
               </div>
             );

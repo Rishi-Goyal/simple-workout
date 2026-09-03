@@ -5,12 +5,36 @@ import { VitePWA } from "vite-plugin-pwa";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
+// Attribution for bundled exercise frames, from the pinned media manifest.
+// Only verified entries ship, so only they are credited.
+function mediaCredits() {
+  const manifest = JSON.parse(readFileSync(new URL("./src/v2/media/manifest.json", import.meta.url), "utf8"));
+  const verified = Object.entries<any>(manifest.entries).filter(([, e]) => e.verified);
+  const fedCount = verified.filter(([, e]) => e.source === "free-exercise-db").length;
+  const fed = manifest.sources["free-exercise-db"];
+  return {
+    fed: fedCount ? { commit: fed.commit, url: fed.url, count: fedCount } : null,
+    wger: verified
+      .filter(([, e]) => e.source === "wger")
+      .map(([exerciseId, e]) => ({
+        exerciseId,
+        upstreamId: e.upstreamId,
+        author: e.author ?? null,
+        license: e.license,
+        licenseUrl: e.licenseUrl ?? null,
+        sourceUrl: e.sourceUrl ?? null
+      })),
+    local: verified.filter(([, e]) => e.source === "local").length
+  };
+}
+
 export default defineConfig({
   base: "/simple-workout/",
   define: {
     // Shown in Settings > App so an installed PWA can prove which build it runs.
     __APP_VERSION__: JSON.stringify(pkg.version),
-    __BUILD_TIME__: JSON.stringify(new Date().toISOString())
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __MEDIA_CREDITS__: JSON.stringify(mediaCredits())
   },
   plugins: [
     react(),
@@ -36,7 +60,7 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,wasm}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,webp,wasm}"],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         // Google Fonts (Roboto, Google Sans Flex, Material Symbols icons)
         // must survive offline — the icon font renders as raw ligature text

@@ -8,16 +8,21 @@ import {
   aimLabel,
   aimValue,
   chipValues,
+  easierExercise,
   getExerciseV2,
+  graduationTarget,
   ladderOf,
   nextWeight,
   shouldGraduate,
   targetLabel,
-  valueLabel
+  valueLabel,
+  weightLabel
 } from "../engine";
 import {
   clearSetsFor,
   finishSession,
+  getEquipTier,
+  getLevels,
   getPref,
   getSession,
   getWeight,
@@ -34,6 +39,7 @@ import {
 import { useV2Session } from "../sessionStore";
 import { viewTransition } from "../motion";
 import { Icon, Pill } from "../ui";
+import { ExerciseMedia } from "../media/ExerciseMedia";
 
 function mmss(sec: number): string {
   const s = Math.max(0, sec);
@@ -150,7 +156,10 @@ function ExerciseStep() {
   const done = sets.length >= ex.target.sets;
   const last = exIdx >= items.length - 1;
   const weight = getWeight(ex.id);
-  const easierEx = ex.rung > 1 ? ladder.rungs.find((r) => r.rung === ex.rung - 1 && r.canonical) ?? ladder.rungs.find((r) => r.rung === ex.rung - 1) : undefined;
+  const tier = getEquipTier();
+  // Same equipment-aware walk as prescription: a demotion never lands on a
+  // rung the user can't do.
+  const easierEx = easierExercise(ex, tier);
 
   function log(value: number) {
     if (done) return;
@@ -221,27 +230,7 @@ function ExerciseStep() {
         </div>
       </div>
 
-      <div
-        style={{
-          marginTop: 12,
-          height: 180,
-          borderRadius: 16,
-          background: "var(--color-grey-100)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
-          color: "var(--color-grey-600)",
-          border: "1px dashed var(--color-grey-300)",
-          flexShrink: 0
-        }}
-      >
-        <Icon name="image" size={40} />
-        <span style={{ fontSize: 12, letterSpacing: 0.4 }}>
-          {ex.mediaRef ? ex.name : `Photo — ${ex.name} (pending verification)`}
-        </span>
-      </div>
+      <ExerciseMedia key={ex.id} exercise={ex} pattern={ladder.pattern} />
 
       <div style={{ marginTop: 20, fontSize: 12, fontWeight: 500, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--color-grey-600)" }}>
         {ladder.label} · rung {ex.rung} of {Math.max(...ladder.rungs.map((r) => r.rung))}
@@ -257,7 +246,7 @@ function ExerciseStep() {
         </span>
         <span style={{ fontSize: 16, color: "var(--color-grey-700)" }}>
           · aim for {aimLabel(ex.target)}
-          {weight != null ? ` · ${weight} kg` : ""}
+          {weight != null ? ` · ${weightLabel(ex, weight)}` : ""}
         </span>
       </div>
       <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", minHeight: 32 }}>
@@ -465,6 +454,8 @@ function FinishStep() {
     const session = getSession(sessionId);
     if (!session || session.finished_at) return;
     const items = sessionItems(sessionId);
+    const levels = getLevels();
+    const tier = getEquipTier();
     const levelUps: { pattern: PatternId; fromName: string; toName: string }[] = [];
     for (const item of items) {
       const ex = getExerciseV2(item.exercise_id);
@@ -478,8 +469,10 @@ function FinishStep() {
         const next = nextWeight(ex, sets, cur);
         if (next !== cur) setWeight(ex.id, next);
       }
-      if (shouldGraduate(ex, sets, previousTopStreak(ex.id, sessionId)) && ex.rung < Math.max(...ladder.rungs.map((r) => r.rung))) {
-        const to = ladder.rungs.find((r) => r.rung === ex.rung + 1 && r.canonical) ?? ladder.rungs.find((r) => r.rung === ex.rung + 1);
+      // Level up only when this exercise IS the stored level (not a
+      // substitution for a blocked rung) and the rung above is doable.
+      if (shouldGraduate(ex, sets, previousTopStreak(ex.id, sessionId))) {
+        const to = graduationTarget(ex, levels[ladder.pattern], tier);
         if (to) {
           setLevel(ladder.pattern, to.rung);
           levelUps.push({ pattern: ladder.pattern, fromName: ex.name, toName: to.name });

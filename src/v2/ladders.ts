@@ -7,9 +7,15 @@
  * graduation rules promote between sessions, and exercises sharing the same
  * (pattern, rung) are sideways-swap alternates.
  *
+ * Equipment lists are AND-semantics: every listed item is required (`["none"]`
+ * stands alone). Loaded rungs carry an `implement`, which fixes what
+ * `startWeightKg` means (per dumbbell / total bar / machine stack / added
+ * load) and the weight increment the engine uses.
+ *
  * No runtime media lookups: `mediaRef` is a pinned asset filename committed to
  * the repo, filled in during the one-time illustration review gate (assets
- * sourced from free-exercise-db, public domain). Null until verified.
+ * sourced from free-exercise-db, public domain; wger CC-BY-SA for gaps; our own
+ * drawings otherwise — see src/v2/media/manifest.json). Null until verified.
  */
 
 export type PatternId =
@@ -33,6 +39,13 @@ export type Equipment =
   | "bench"
   | "machine";
 
+/** What a loaded rung's kg number refers to; also selects the weight increment. */
+export type Implement =
+  | "dumbbell" // per dumbbell (one in each hand, or the single goblet bell)
+  | "barbell" // total bar weight
+  | "machine" // stack / plate setting
+  | "added"; // weight added to bodyweight (belt or held dumbbell)
+
 export type Target = {
   sets: number;
   unit: "reps" | "seconds";
@@ -47,8 +60,10 @@ export type GraduateRule =
   | { kind: "top_of_range"; sessions: number }
   /** Loaded rung: hit sets × high at or above this weight → rung up. */
   | { kind: "load_threshold"; weightKg: number }
-  /** Top of the ladder: progress by load forever (v1 double-progression logic). */
-  | { kind: "terminal" };
+  /** Top of the ladder, loaded: progress by load forever (double progression). */
+  | { kind: "terminal" }
+  /** Top of the ladder, bodyweight: nowhere further to go by design. */
+  | { kind: "maintain" };
 
 export type LadderExercise = {
   id: string;
@@ -57,9 +72,12 @@ export type LadderExercise = {
   rung: number;
   /** The default prescription for the rung; alternates surface only via Swap. */
   canonical: boolean;
+  /** ALL listed items are required (AND). `["none"]` must appear alone. */
   equipment: Equipment[];
   load: "bodyweight" | "loaded";
-  /** For loaded moves: suggested first working weight (per implement for DBs). */
+  /** Loaded rungs only: what the kg means and how it increments. */
+  implement?: Implement;
+  /** Loaded rungs only: suggested first working weight, in `implement` units. */
   startWeightKg?: number;
   target: Target;
   graduate: GraduateRule;
@@ -120,7 +138,7 @@ const SQUAT: Ladder = {
         "Sit back down slowly — 2–3 seconds on the way down.",
       ],
       cue: "Slow on the way down; no hands.",
-      mediaRef: null,
+      mediaRef: "sq1_box_sit_to_stand",
     },
     {
       id: "sq2_bodyweight_squat",
@@ -137,7 +155,7 @@ const SQUAT: Ladder = {
         "Drive through the whole foot to stand; knees track over toes.",
       ],
       cue: "Chest up, knees out, full depth.",
-      mediaRef: null,
+      mediaRef: "sq2_bodyweight_squat",
     },
     {
       id: "sq3_goblet_squat",
@@ -146,6 +164,7 @@ const SQUAT: Ladder = {
       canonical: true,
       equipment: ["dumbbell"],
       load: "loaded",
+      implement: "dumbbell",
       startWeightKg: 12,
       target: { sets: 3, unit: "reps", low: 8, high: 12 },
       graduate: { kind: "load_threshold", weightKg: 24 },
@@ -155,7 +174,7 @@ const SQUAT: Ladder = {
         "Stand up without letting the weight pull you forward.",
       ],
       cue: "Elbows inside the knees at the bottom.",
-      mediaRef: null,
+      mediaRef: "sq3_goblet_squat",
     },
     {
       id: "sq4_db_front_squat",
@@ -164,6 +183,7 @@ const SQUAT: Ladder = {
       canonical: true,
       equipment: ["dumbbell"],
       load: "loaded",
+      implement: "dumbbell",
       startWeightKg: 12,
       target: { sets: 3, unit: "reps", low: 8, high: 12 },
       graduate: { kind: "load_threshold", weightKg: 20 },
@@ -173,7 +193,7 @@ const SQUAT: Ladder = {
         "Stand tall; don't let the elbows drop as you fatigue.",
       ],
       cue: "Elbows up keeps the chest up.",
-      mediaRef: null,
+      mediaRef: "sq4_db_front_squat",
     },
     {
       id: "sq4_alt_leg_press",
@@ -182,6 +202,7 @@ const SQUAT: Ladder = {
       canonical: false,
       equipment: ["machine"],
       load: "loaded",
+      implement: "machine",
       startWeightKg: 60,
       target: { sets: 3, unit: "reps", low: 10, high: 12 },
       graduate: { kind: "load_threshold", weightKg: 120 },
@@ -191,7 +212,7 @@ const SQUAT: Ladder = {
         "Press through the whole foot; don't slam the lockout.",
       ],
       cue: "Lower back stays glued to the pad.",
-      mediaRef: null,
+      mediaRef: "sq4_alt_leg_press",
     },
     {
       id: "sq5_back_squat",
@@ -200,6 +221,7 @@ const SQUAT: Ladder = {
       canonical: true,
       equipment: ["barbell"],
       load: "loaded",
+      implement: "barbell",
       startWeightKg: 40,
       target: { sets: 3, unit: "reps", low: 5, high: 8 },
       graduate: { kind: "terminal" },
@@ -209,7 +231,7 @@ const SQUAT: Ladder = {
         "Brace, sit down and back to at least parallel, drive back up.",
       ],
       cue: "Big breath, brace, knees out.",
-      mediaRef: null,
+      mediaRef: "sq5_back_squat",
     },
   ],
 };
@@ -238,7 +260,7 @@ const HINGE: Ladder = {
         "Squeeze glutes at the top for a second; lower slowly.",
       ],
       cue: "Squeeze at the top, don't arch the lower back.",
-      mediaRef: null,
+      mediaRef: "hg1_glute_bridge",
     },
     {
       id: "hg2_single_leg_glute_bridge",
@@ -255,7 +277,7 @@ const HINGE: Ladder = {
         "Lower slowly; finish all reps on one side before switching.",
       ],
       cue: "Hips level — don't let one side sag.",
-      mediaRef: null,
+      mediaRef: "hg2_single_leg_glute_bridge",
     },
     {
       id: "hg3_db_rdl",
@@ -264,6 +286,7 @@ const HINGE: Ladder = {
       canonical: true,
       equipment: ["dumbbell"],
       load: "loaded",
+      implement: "dumbbell",
       startWeightKg: 14,
       target: { sets: 3, unit: "reps", low: 10, high: 12 },
       graduate: { kind: "load_threshold", weightKg: 22 },
@@ -273,7 +296,7 @@ const HINGE: Ladder = {
         "Stop at a deep hamstring stretch; drive hips forward to stand.",
       ],
       cue: "Hips back, flat back, weights close to the legs.",
-      mediaRef: null,
+      mediaRef: "hg3_db_rdl",
     },
     {
       id: "hg4_barbell_rdl",
@@ -282,6 +305,7 @@ const HINGE: Ladder = {
       canonical: true,
       equipment: ["barbell"],
       load: "loaded",
+      implement: "barbell",
       startWeightKg: 40,
       target: { sets: 3, unit: "reps", low: 8, high: 10 },
       graduate: { kind: "load_threshold", weightKg: 60 },
@@ -291,7 +315,7 @@ const HINGE: Ladder = {
         "Stand by driving hips forward; squeeze glutes at the top.",
       ],
       cue: "The bar drags up and down your thighs.",
-      mediaRef: null,
+      mediaRef: "hg4_barbell_rdl",
     },
     {
       id: "hg5_deadlift",
@@ -300,6 +324,7 @@ const HINGE: Ladder = {
       canonical: true,
       equipment: ["barbell"],
       load: "loaded",
+      implement: "barbell",
       startWeightKg: 60,
       target: { sets: 3, unit: "reps", low: 3, high: 5 },
       graduate: { kind: "terminal" },
@@ -309,7 +334,7 @@ const HINGE: Ladder = {
         "Push the floor away; stand tall, then hips back first to lower.",
       ],
       cue: "Slack out of the bar before it leaves the floor.",
-      mediaRef: null,
+      mediaRef: "hg5_deadlift",
     },
   ],
 };
@@ -338,7 +363,7 @@ const H_PUSH: Ladder = {
         "Push back to straight arms without shrugging.",
       ],
       cue: "Body moves as one plank.",
-      mediaRef: null,
+      mediaRef: "hp1_wall_pushup",
     },
     {
       id: "hp2_incline_pushup",
@@ -355,7 +380,7 @@ const H_PUSH: Ladder = {
         "Press back up; the lower the surface, the harder it gets.",
       ],
       cue: "Squeeze glutes so the hips don't sag.",
-      mediaRef: null,
+      mediaRef: "hp2_incline_pushup",
     },
     {
       id: "hp3_knee_pushup",
@@ -372,7 +397,7 @@ const H_PUSH: Ladder = {
         "Press up fully; keep the neck long, eyes down.",
       ],
       cue: "Chest touches first — not the hips.",
-      mediaRef: null,
+      mediaRef: "hp3_knee_pushup",
     },
     {
       id: "hp4_pushup",
@@ -389,7 +414,7 @@ const H_PUSH: Ladder = {
         "Press back up in one line — hips neither sag nor pike.",
       ],
       cue: "Rigid plank, elbows ~45°.",
-      mediaRef: null,
+      mediaRef: "hp4_pushup",
     },
     {
       id: "hp5_db_bench_press",
@@ -398,6 +423,7 @@ const H_PUSH: Ladder = {
       canonical: true,
       equipment: ["dumbbell", "bench"],
       load: "loaded",
+      implement: "dumbbell",
       startWeightKg: 12,
       target: { sets: 3, unit: "reps", low: 8, high: 12 },
       graduate: { kind: "load_threshold", weightKg: 22 },
@@ -407,7 +433,26 @@ const H_PUSH: Ladder = {
         "Lower until elbows dip just below the bench line.",
       ],
       cue: "Wrists stacked over elbows the whole rep.",
-      mediaRef: null,
+      mediaRef: "hp5_db_bench_press",
+    },
+    {
+      id: "hp5_alt_db_floor_press",
+      name: "DB Floor Press",
+      rung: 5,
+      canonical: false,
+      equipment: ["dumbbell"],
+      load: "loaded",
+      implement: "dumbbell",
+      startWeightKg: 12,
+      target: { sets: 3, unit: "reps", low: 8, high: 12 },
+      graduate: { kind: "load_threshold", weightKg: 20 },
+      howTo: [
+        "Lie on the floor, knees bent, a dumbbell in each hand at chest level.",
+        "Press up until arms are straight over the chest.",
+        "Lower until the upper arms rest on the floor; pause, then press again.",
+      ],
+      cue: "Elbows touch down softly — no bouncing off the floor.",
+      mediaRef: "hp5_alt_db_floor_press",
     },
     {
       id: "hp5_alt_decline_pushup",
@@ -424,7 +469,7 @@ const H_PUSH: Ladder = {
         "Press up keeping the body in one line.",
       ],
       cue: "Don't let the hips drop as you fatigue.",
-      mediaRef: null,
+      mediaRef: "hp5_alt_decline_pushup",
     },
     {
       id: "hp6_bench_press",
@@ -433,6 +478,7 @@ const H_PUSH: Ladder = {
       canonical: true,
       equipment: ["barbell", "bench"],
       load: "loaded",
+      implement: "barbell",
       startWeightKg: 40,
       target: { sets: 3, unit: "reps", low: 5, high: 8 },
       graduate: { kind: "terminal" },
@@ -442,24 +488,27 @@ const H_PUSH: Ladder = {
         "Lower to mid-chest, elbows ~45°; press back without bouncing.",
       ],
       cue: "Bar path: chest to over the shoulders, slight arc.",
-      mediaRef: null,
+      mediaRef: "hp6_bench_press",
     },
     {
       id: "hp6_alt_dips",
       name: "Dips",
       rung: 6,
       canonical: false,
-      equipment: ["machine"],
-      load: "bodyweight",
+      equipment: ["machine", "dumbbell"],
+      load: "loaded",
+      implement: "added",
+      startWeightKg: 0,
       target: { sets: 3, unit: "reps", low: 5, high: 10 },
-      graduate: { kind: "top_of_range", sessions: 2 },
+      graduate: { kind: "terminal" },
       howTo: [
         "Support on parallel bars, arms straight, slight forward lean.",
         "Lower until shoulders reach elbow height — no deeper if they complain.",
         "Press back up and squeeze the chest at the top.",
+        "Once 3×10 is easy, add load with a dip belt or a dumbbell between the feet.",
       ],
       cue: "Shoulders down and back, lean forward for chest.",
-      mediaRef: null,
+      mediaRef: "hp6_alt_dips",
     },
     {
       id: "hp6_alt_incline_db_press",
@@ -468,6 +517,7 @@ const H_PUSH: Ladder = {
       canonical: false,
       equipment: ["dumbbell", "bench"],
       load: "loaded",
+      implement: "dumbbell",
       startWeightKg: 12,
       target: { sets: 3, unit: "reps", low: 8, high: 12 },
       graduate: { kind: "terminal" },
@@ -477,7 +527,7 @@ const H_PUSH: Ladder = {
         "Press up and slightly in; don't clang the bells.",
       ],
       cue: "Upper chest does the work — keep the arch modest.",
-      mediaRef: null,
+      mediaRef: "hp6_alt_incline_db_press",
     },
   ],
 };
@@ -506,7 +556,7 @@ const V_PUSH: Ladder = {
         "Press back up until arms are straight.",
       ],
       cue: "Head travels down between the hands.",
-      mediaRef: null,
+      mediaRef: "vp1_wall_pike_press",
     },
     {
       id: "vp2_pike_pushup",
@@ -523,7 +573,7 @@ const V_PUSH: Ladder = {
         "Press back to straight arms; keep the hips high throughout.",
       ],
       cue: "It's a shoulder press, not a push-up — hips stay up.",
-      mediaRef: null,
+      mediaRef: "vp2_pike_pushup",
     },
     {
       id: "vp3_elevated_pike_pushup",
@@ -540,7 +590,7 @@ const V_PUSH: Ladder = {
         "Press out fully; more foot height = closer to a handstand press.",
       ],
       cue: "Stack hips over shoulders over hands.",
-      mediaRef: null,
+      mediaRef: "vp3_elevated_pike_pushup",
     },
     {
       id: "vp4_db_shoulder_press",
@@ -549,6 +599,7 @@ const V_PUSH: Ladder = {
       canonical: true,
       equipment: ["dumbbell"],
       load: "loaded",
+      implement: "dumbbell",
       startWeightKg: 8,
       target: { sets: 3, unit: "reps", low: 8, high: 12 },
       graduate: { kind: "load_threshold", weightKg: 16 },
@@ -558,7 +609,7 @@ const V_PUSH: Ladder = {
         "Lower to ear height under control; don't lean back.",
       ],
       cue: "Ribs down — press with shoulders, not lower back.",
-      mediaRef: null,
+      mediaRef: "vp4_db_shoulder_press",
     },
     {
       id: "vp4_alt_machine_shoulder_press",
@@ -567,6 +618,7 @@ const V_PUSH: Ladder = {
       canonical: false,
       equipment: ["machine"],
       load: "loaded",
+      implement: "machine",
       startWeightKg: 20,
       target: { sets: 3, unit: "reps", low: 8, high: 12 },
       graduate: { kind: "load_threshold", weightKg: 40 },
@@ -576,7 +628,7 @@ const V_PUSH: Ladder = {
         "Lower under control to the start.",
       ],
       cue: "Back stays on the pad.",
-      mediaRef: null,
+      mediaRef: "vp4_alt_machine_shoulder_press",
     },
     {
       id: "vp5_barbell_ohp",
@@ -585,6 +637,7 @@ const V_PUSH: Ladder = {
       canonical: true,
       equipment: ["barbell"],
       load: "loaded",
+      implement: "barbell",
       startWeightKg: 30,
       target: { sets: 3, unit: "reps", low: 5, high: 8 },
       graduate: { kind: "terminal" },
@@ -594,7 +647,7 @@ const V_PUSH: Ladder = {
         "Push your head through once the bar clears; lock out overhead.",
       ],
       cue: "Squeeze glutes so the lower back can't arch.",
-      mediaRef: null,
+      mediaRef: "vp5_barbell_ohp",
     },
   ],
 };
@@ -623,7 +676,7 @@ const H_PULL: Ladder = {
         "Pull your chest to your hands, squeezing shoulder blades together.",
       ],
       cue: "Walk the feet forward to make it harder.",
-      mediaRef: null,
+      mediaRef: "hpu1_doorway_row",
     },
     {
       id: "hpu2_band_row",
@@ -640,14 +693,14 @@ const H_PULL: Ladder = {
         "Squeeze the shoulder blades; return slowly to full stretch.",
       ],
       cue: "Shoulders stay down — no shrugging into the pull.",
-      mediaRef: null,
+      mediaRef: "hpu2_band_row",
     },
     {
       id: "hpu3_inverted_row",
       name: "Inverted Row",
       rung: 3,
       canonical: true,
-      equipment: ["barbell", "machine"],
+      equipment: ["barbell"],
       load: "bodyweight",
       target: { sets: 3, unit: "reps", low: 5, high: 10 },
       graduate: { kind: "top_of_range", sessions: 2 },
@@ -657,25 +710,26 @@ const H_PULL: Ladder = {
         "Lower to straight arms; the flatter your body, the harder it is.",
       ],
       cue: "Plank rules apply — hips locked in line.",
-      mediaRef: null,
+      mediaRef: "hpu3_inverted_row",
     },
     {
       id: "hpu4_one_arm_db_row",
       name: "One-Arm DB Row",
       rung: 4,
       canonical: true,
-      equipment: ["dumbbell", "bench"],
+      equipment: ["dumbbell", "box"],
       load: "loaded",
+      implement: "dumbbell",
       startWeightKg: 12,
       target: { sets: 3, unit: "reps", low: 8, high: 12, perSide: true },
       graduate: { kind: "load_threshold", weightKg: 24 },
       howTo: [
-        "One hand and knee on a bench, back flat, dumbbell hanging.",
+        "One hand and knee on a bench or sturdy chair, back flat, dumbbell hanging.",
         "Row the weight to your hip, elbow tracking close to the body.",
         "Lower to a full stretch without rotating the torso.",
       ],
       cue: "Pull with the elbow, not the hand.",
-      mediaRef: null,
+      mediaRef: "hpu4_one_arm_db_row",
     },
     {
       id: "hpu5_barbell_row",
@@ -684,6 +738,7 @@ const H_PULL: Ladder = {
       canonical: true,
       equipment: ["barbell"],
       load: "loaded",
+      implement: "barbell",
       startWeightKg: 40,
       target: { sets: 3, unit: "reps", low: 5, high: 8 },
       graduate: { kind: "terminal" },
@@ -693,7 +748,7 @@ const H_PULL: Ladder = {
         "Lower under control; torso angle stays fixed — no heaving.",
       ],
       cue: "If the torso bounces, the weight is too heavy.",
-      mediaRef: null,
+      mediaRef: "hpu5_barbell_row",
     },
     {
       id: "hpu5_alt_seated_cable_row",
@@ -702,6 +757,7 @@ const H_PULL: Ladder = {
       canonical: false,
       equipment: ["machine"],
       load: "loaded",
+      implement: "machine",
       startWeightKg: 35,
       target: { sets: 3, unit: "reps", low: 8, high: 12 },
       graduate: { kind: "terminal" },
@@ -711,7 +767,7 @@ const H_PULL: Ladder = {
         "Return slowly to a full stretch without slumping forward.",
       ],
       cue: "Torso stays near-vertical both ways.",
-      mediaRef: null,
+      mediaRef: "hpu5_alt_seated_cable_row",
     },
   ],
 };
@@ -740,7 +796,7 @@ const V_PULL: Ladder = {
         "Keep shoulders active — pulled slightly down, not up by your ears.",
       ],
       cue: "Breathe. Grip strength is the workout.",
-      mediaRef: null,
+      mediaRef: "vpu1_dead_hang",
     },
     {
       id: "vpu2_scapular_pulls",
@@ -757,7 +813,7 @@ const V_PULL: Ladder = {
         "Lower back to a full hang with control.",
       ],
       cue: "Arms stay straight; the shoulder blades do everything.",
-      mediaRef: null,
+      mediaRef: "vpu2_scapular_pulls",
     },
     {
       id: "vpu3_band_assisted_pullup",
@@ -774,7 +830,7 @@ const V_PULL: Ladder = {
         "Lower to a full hang each rep. Thinner band = harder.",
       ],
       cue: "Full hang at the bottom — no half reps.",
-      mediaRef: null,
+      mediaRef: "vpu3_band_assisted_pullup",
     },
     {
       id: "vpu3_alt_lat_pulldown",
@@ -783,6 +839,7 @@ const V_PULL: Ladder = {
       canonical: false,
       equipment: ["machine"],
       load: "loaded",
+      implement: "machine",
       startWeightKg: 30,
       target: { sets: 3, unit: "reps", low: 8, high: 12 },
       graduate: { kind: "load_threshold", weightKg: 50 },
@@ -792,7 +849,7 @@ const V_PULL: Ladder = {
         "Return all the way up to a full stretch each rep.",
       ],
       cue: "Elbows down and back, not hands to chin.",
-      mediaRef: null,
+      mediaRef: "vpu3_alt_lat_pulldown",
     },
     {
       id: "vpu4_negative_pullups",
@@ -809,7 +866,7 @@ const V_PULL: Ladder = {
         "Step back up and repeat. The descent is the whole exercise.",
       ],
       cue: "Fight gravity the entire way down.",
-      mediaRef: null,
+      mediaRef: "vpu4_negative_pullups",
     },
     {
       id: "vpu5_pull_up",
@@ -826,7 +883,7 @@ const V_PULL: Ladder = {
         "Chin over the bar at the top; lower to a full hang.",
       ],
       cue: "Start each rep from a dead stop.",
-      mediaRef: null,
+      mediaRef: "vpu5_pull_up",
     },
     {
       id: "vpu6_weighted_pullup",
@@ -835,6 +892,7 @@ const V_PULL: Ladder = {
       canonical: true,
       equipment: ["pullup_bar", "dumbbell"],
       load: "loaded",
+      implement: "added",
       startWeightKg: 2.5,
       target: { sets: 3, unit: "reps", low: 3, high: 6 },
       graduate: { kind: "terminal" },
@@ -844,7 +902,7 @@ const V_PULL: Ladder = {
         "Add load only when all sets hit the top of the range.",
       ],
       cue: "Quality first — the standard never loosens.",
-      mediaRef: null,
+      mediaRef: "vpu6_weighted_pullup",
     },
   ],
 };
@@ -873,7 +931,7 @@ const CORE: Ladder = {
         "Return and switch sides; lower back stays pressed into the floor.",
       ],
       cue: "If the lower back arches, shorten the reach.",
-      mediaRef: null,
+      mediaRef: "co1_dead_bug",
     },
     {
       id: "co2_plank",
@@ -890,7 +948,7 @@ const CORE: Ladder = {
         "Hold. Stop the set when the hips start to sag.",
       ],
       cue: "A short perfect plank beats a long saggy one.",
-      mediaRef: null,
+      mediaRef: "co2_plank",
     },
     {
       id: "co3_side_plank",
@@ -907,7 +965,7 @@ const CORE: Ladder = {
         "Hold, then switch sides.",
       ],
       cue: "Push the floor away — don't hang on the shoulder.",
-      mediaRef: null,
+      mediaRef: "co3_side_plank",
     },
     {
       id: "co4_hollow_hold",
@@ -924,7 +982,7 @@ const CORE: Ladder = {
         "Hold the banana shape; bend knees to make it easier.",
       ],
       cue: "Lower back glued to the floor is the whole point.",
-      mediaRef: null,
+      mediaRef: "co4_hollow_hold",
     },
     {
       id: "co5_hanging_knee_raise",
@@ -934,14 +992,14 @@ const CORE: Ladder = {
       equipment: ["pullup_bar"],
       load: "bodyweight",
       target: { sets: 3, unit: "reps", low: 6, high: 12 },
-      graduate: { kind: "terminal" },
+      graduate: { kind: "maintain" },
       howTo: [
         "Dead hang from the bar, shoulders active.",
         "Lift your knees to hip height or higher without swinging.",
         "Lower slowly; straighten the legs over time to progress.",
       ],
       cue: "Slow down before you swing.",
-      mediaRef: null,
+      mediaRef: "co5_hanging_knee_raise",
     },
   ],
 };
