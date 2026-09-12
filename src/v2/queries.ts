@@ -5,6 +5,7 @@
 import { all, lastInsertId, notifyChange, one, run } from "../db/client";
 import { localDateIso } from "../lib/dates";
 import { LADDERS, type DayType, type PatternId } from "./ladders";
+import type { RewardLine } from "./rewards";
 import {
   computeStreaks,
   getExerciseV2,
@@ -249,4 +250,77 @@ export function recentPromotions(): Set<PatternId> {
   if (!last) return new Set();
   const ups = JSON.parse(last.level_ups_json || "[]") as { pattern: PatternId }[];
   return new Set(ups.map((u) => u.pattern));
+}
+
+// ---------- rewards (Pocket Lab hourglasses) ----------
+
+export type RewardRow = {
+  session_id: number;
+  grant_key: string;
+  hourglasses: number;
+  breakdown_json: string;
+  created_at: string;
+  synced_at: string | null;
+};
+
+export type RewardWithDate = RewardRow & { date: string };
+
+export function getReward(sessionId: number): RewardRow | undefined {
+  return one<RewardRow>("SELECT * FROM v2_rewards WHERE session_id = ?", [sessionId]);
+}
+
+/** Idempotent per session: a second call (StrictMode, re-render) is a no-op. */
+export function createReward(sessionId: number, grantKey: string, hourglasses: number, breakdown: RewardLine[]): RewardRow {
+  run(
+    `INSERT INTO v2_rewards (session_id, grant_key, hourglasses, breakdown_json, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(session_id) DO NOTHING`,
+    [sessionId, grantKey, hourglasses, JSON.stringify(breakdown), new Date().toISOString()]
+  );
+  notifyChange();
+  return getReward(sessionId)!;
+}
+
+export function unsyncedRewards(): RewardWithDate[] {
+  return all<RewardWithDate>(
+    `SELECT r.*, s.date FROM v2_rewards r
+       JOIN v2_sessions s ON s.id = r.session_id
+      WHERE r.synced_at IS NULL
+      ORDER BY r.session_id`
+  );
+}
+
+export function markRewardsSynced(grantKeys: string[]): void {
+  if (grantKeys.length === 0) return;
+  const placeholders = grantKeys.map(() => "?").join(", ");
+  run(`UPDATE v2_rewards SET synced_at = ? WHERE synced_at IS NULL AND grant_key IN (${placeholders})`, [
+    new Date().toISOString(),
+    ...grantKeys
+  ]);
+  notifyChange();
+}
+
+export function recentRewards(limit = 5): RewardWithDate[] {
+  return all<RewardWithDate>(
+    `SELECT r.*, s.date FROM v2_rewards r
+       JOIN v2_sessions s ON s.id = r.session_id
+      ORDER BY r.session_id DESC LIMIT ?`,
+    [limit]
+  );
+}
+
+export function rewardTotals(): { count: number; earned: number; unsynced: number } {
+  const r = one<{ count: number; earned: number; unsynced: number }>(
+    `SELECT COUNT(*) AS count,
+            COALESCE(SUM(hourglasses), 0) AS earned,
+            COALESCE(SUM(CASE WHEN synced_at IS NULL THEN 1 ELSE 0 END), 0) AS unsynced
+       FROM v2_rewards`
+  );
+  return { count: Number(r?.count ?? 0), earned: Number(r?.earned ?? 0), unsynced: Number(r?.unsynced ?? 0) };
+}
+
+/** Finished sessions on a local calendar day (streak bonus is once per day). */
+export function finishedSessionsOn(date: string): number {
+  const r = one<{ n: number }>("SELECT COUNT(*) AS n FROM v2_sessions WHERE date = ? AND finished_at IS NOT NULL", [date]);
+  return Number(r?.n ?? 0);
 }

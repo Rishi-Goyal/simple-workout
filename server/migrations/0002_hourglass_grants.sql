@@ -1,16 +1,6 @@
-CREATE TABLE IF NOT EXISTS backups (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  schema_version INTEGER NOT NULL,
-  app_version TEXT,
-  size_bytes INTEGER NOT NULL,
-  payload TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_backups_user ON backups(username, id);
-
--- Pocket Lab hourglass ledger (see migrations/0002_hourglass_grants.sql).
+-- Pocket Lab hourglass ledger. One row per finished workout session; the
+-- workout app inserts, the Pocket Lab app claims. grant_key is minted by the
+-- workout app and is also embedded in the offline claim code.
 CREATE TABLE IF NOT EXISTS hourglass_grants (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL,

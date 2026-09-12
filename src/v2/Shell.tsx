@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { dbIsPersistent, useDbReady, useDbVersion } from "../db/client";
+import { syncPendingRewards } from "../lib/hourglassApi";
 import { getPref } from "./queries";
 import { OnboardV2 } from "./screens/Onboard";
 
@@ -12,6 +14,16 @@ export function ShellV2() {
   useDbVersion();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Push any Pocket Lab hourglass grants that could not be sent when the
+  // workout finished (offline, signed in later). Coalesced inside the API.
+  useEffect(() => {
+    if (!dbReady) return;
+    void syncPendingRewards();
+    const onOnline = () => void syncPendingRewards();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [dbReady]);
 
   if (!dbReady) {
     return (

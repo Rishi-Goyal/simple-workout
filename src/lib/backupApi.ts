@@ -32,7 +32,7 @@ export function getLastBackupAt(): string | null {
   return localStorage.getItem(LAST_BACKUP_KEY);
 }
 
-function requireConfig(): BackupConfig {
+export function requireBackupConfig(): BackupConfig {
   const config = getBackupConfig();
   if (!config.url || !config.user || !config.password) {
     throw new Error("Set the username and password in Settings first.");
@@ -40,9 +40,19 @@ function requireConfig(): BackupConfig {
   return config;
 }
 
-function authHeader(config: BackupConfig): string {
-  return "Basic " + btoa(`${config.user}:${config.password}`);
+/**
+ * HTTP Basic header. Credentials are UTF-8 encoded before base64 — plain
+ * btoa() throws on any character above U+00FF, so a password with an accent
+ * or an em dash would never reach the server. The worker decodes the same way.
+ */
+export function authHeader(config: BackupConfig): string {
+  const bytes = new TextEncoder().encode(`${config.user}:${config.password}`);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return "Basic " + btoa(bin);
 }
+
+const requireConfig = requireBackupConfig;
 
 export async function uploadBackup(payload: BackupPayloadV1): Promise<void> {
   const config = requireConfig();
