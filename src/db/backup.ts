@@ -17,7 +17,8 @@ const TABLE_ORDER = [
   "v2_session_items",
   "v2_sets",
   "v2_prefs",
-  "v2_weights"
+  "v2_weights",
+  "v2_rewards"
 ] as const;
 
 /** Tables a version-1 payload doesn't have; restored as empty. */
@@ -27,8 +28,12 @@ const V2_TABLES = new Set<string>([
   "v2_session_items",
   "v2_sets",
   "v2_prefs",
-  "v2_weights"
+  "v2_weights",
+  "v2_rewards"
 ]);
+
+/** Tables added after version 2 shipped; older v2 payloads simply lack them. */
+const OPTIONAL_TABLES = new Set<string>(["v2_rewards"]);
 
 type TableName = (typeof TABLE_ORDER)[number];
 
@@ -48,7 +53,8 @@ const TABLE_ORDER_BY: Record<TableName, string> = {
   v2_session_items: "session_id, position",
   v2_sets: "id",
   v2_prefs: "key",
-  v2_weights: "exercise_id"
+  v2_weights: "exercise_id",
+  v2_rewards: "session_id"
 };
 
 // Known columns per table (mirrors schema.ts). Backups from a newer app
@@ -81,7 +87,11 @@ const TABLE_COLUMNS: Record<TableName, string[]> = {
     "completed_at"
   ],
   v2_prefs: ["key", "value"],
-  v2_weights: ["exercise_id", "weight_kg", "updated_at"]
+  v2_weights: ["exercise_id", "weight_kg", "updated_at"],
+  v2_rewards: [
+    "session_id", "grant_key", "hourglasses", "breakdown_json", "created_at",
+    "synced_at"
+  ]
 };
 
 export interface BackupPayloadV1 {
@@ -112,7 +122,7 @@ export function importBackup(payload: BackupPayloadV1): void {
   for (const table of TABLE_ORDER) {
     if (!Array.isArray(payload.tables?.[table])) {
       // v1 backups predate the v2 tables — treat them as empty.
-      if (payload.version === 1 && V2_TABLES.has(table)) {
+      if ((payload.version === 1 && V2_TABLES.has(table)) || OPTIONAL_TABLES.has(table)) {
         payload.tables[table] = [];
         continue;
       }

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useDbVersion } from "../../db/client";
 import { publishSessionToBridge } from "../../lib/calorieBridge";
 import { getBackupConfig, maybeAutoBackup } from "../../lib/backupApi";
+import { syncPendingRewards } from "../../lib/hourglassApi";
 import { WARMUPS, type PatternId } from "../ladders";
 import {
   aimLabel,
@@ -20,7 +21,9 @@ import {
 } from "../engine";
 import {
   clearSetsFor,
+  createReward,
   finishSession,
+  finishedSessionsOn,
   getEquipTier,
   getLevels,
   getPref,
@@ -36,8 +39,10 @@ import {
   setsFor,
   streaks
 } from "../queries";
+import { computeReward, newGrantKey } from "../rewards";
 import { useV2Session } from "../sessionStore";
 import { viewTransition } from "../motion";
+import { HourglassCard } from "./HourglassCard";
 import { Icon, Pill } from "../ui";
 import { ExerciseMedia } from "../media/ExerciseMedia";
 
@@ -482,8 +487,21 @@ function FinishStep() {
     const started = session.started_at ? new Date(session.started_at).getTime() : Date.now();
     const mins = Math.max(1, Math.round((Date.now() - started) / 60000));
     finishSession(sessionId, mins, levelUps);
+    // Pocket Lab hourglasses. streaks() now includes this session; the streak
+    // bonus is once per calendar day. Best-effort: never block the screen.
+    try {
+      const reward = computeReward({
+        levelUps: levelUps.length,
+        streak: streaks().current,
+        firstSessionOfDay: finishedSessionsOn(session.date) <= 1
+      });
+      createReward(sessionId, newGrantKey(), reward.total, reward.breakdown);
+    } catch {
+      /* rewards are a bonus, not a requirement */
+    }
     void publishSessionToBridge(getSession(sessionId)!);
-    maybeAutoBackup();
+    maybeAutoBackup(); // snapshots the reward row too
+    void syncPendingRewards();
     setFinalized(true);
   }, [sessionId]);
 
@@ -548,6 +566,8 @@ function FinishStep() {
           </div>
         </div>
       ))}
+
+      <HourglassCard sessionId={sessionId} />
 
       <div className="anim-fade-up anim-d3" style={{ marginTop: 24, display: "flex", flexDirection: "column" }}>
         {items.map((item) => {

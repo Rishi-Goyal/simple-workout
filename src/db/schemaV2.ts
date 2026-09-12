@@ -54,4 +54,15 @@ CREATE TABLE IF NOT EXISTS v2_weights (
   weight_kg REAL NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+-- Pocket Lab hourglass grants: one per finished session (src/v2/rewards.ts).
+-- grant_key is random so it stays unique even after a DB wipe restarts ids.
+CREATE TABLE IF NOT EXISTS v2_rewards (
+  session_id INTEGER PRIMARY KEY REFERENCES v2_sessions(id) ON DELETE CASCADE,
+  grant_key TEXT NOT NULL UNIQUE,
+  hourglasses INTEGER NOT NULL,
+  breakdown_json TEXT NOT NULL DEFAULT '[]',  -- RewardLine[]
+  created_at TEXT NOT NULL,
+  synced_at TEXT                              -- NULL until the worker acknowledged it
+);
 `;

@@ -9,9 +9,12 @@ import {
   saveBackupConfig,
   uploadBackup
 } from "../../lib/backupApi";
+import { fetchHourglassSummary, syncPendingRewards } from "../../lib/hourglassApi";
 import { EQUIP_TIER_LABELS, getExerciseV2, type EquipTier } from "../engine";
-import { getEquipTier, getPref, setPref } from "../queries";
+import { getEquipTier, getPref, recentRewards, rewardTotals, setPref } from "../queries";
+import { HOURGLASSES_PER_PACK } from "../rewards";
 import { FilterChip, Icon, LightNav, SectionLabel, Switch } from "../ui";
+import { ClaimCode } from "./HourglassCard";
 
 function Row({ children }: { children: ReactNode }) {
   return (
@@ -39,6 +42,11 @@ export function SettingsV2() {
   const [message, setMessage] = useState<string | null>(null);
 
   const lastBackup = getLastBackupAt();
+  const totals = rewardTotals();
+  const packs = Math.floor(totals.earned / HOURGLASSES_PER_PACK);
+  const [codesOpen, setCodesOpen] = useState(false);
+  const [hgMessage, setHgMessage] = useState<string | null>(null);
+  const recent = codesOpen ? recentRewards(5) : [];
   const [creditsOpen, setCreditsOpen] = useState(false);
   const credits = __MEDIA_CREDITS__;
   const [updateState, setUpdateState] = useState<"idle" | "checking" | "reloading" | "up-to-date" | "failed" | "unavailable">("idle");
@@ -82,6 +90,25 @@ export function SettingsV2() {
       setMessage("Restored.");
     } catch (e) {
       setMessage(String((e as Error).message ?? e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function sendPending() {
+    setBusy("hourglass");
+    setHgMessage(null);
+    try {
+      const r = await syncPendingRewards();
+      if (r.status === "failed") {
+        setHgMessage("Couldn't reach the server — check your connection or password.");
+        return;
+      }
+      const summary = await fetchHourglassSummary();
+      const sent = r.status === "sent" ? `Sent ${r.sent}. ` : "";
+      setHgMessage(`${sent}Pocket Lab has ${summary.pending} hourglass${summary.pending === 1 ? "" : "es"} waiting to be claimed.`);
+    } catch (e) {
+      setHgMessage(String((e as Error).message ?? e));
     } finally {
       setBusy(null);
     }
@@ -221,6 +248,59 @@ export function SettingsV2() {
           <Icon name="chevron_right" size={24} color="var(--color-grey-500)" />
         </Row>
         {message && <div style={{ padding: "10px 0", fontSize: 14, color: "var(--color-grey-700)" }}>{message}</div>}
+
+        <SectionLabel style={{ marginTop: 28 }}>Pocket Lab</SectionLabel>
+        <Row>
+          <Icon name="hourglass_top" size={24} fill color="var(--color-blue-700)" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16 }}>
+              {totals.earned} hourglass{totals.earned === 1 ? "" : "es"} earned
+            </div>
+            <div style={{ fontSize: 14, color: "var(--color-grey-700)" }}>
+              {totals.count === 0
+                ? "Finish a workout to earn 12 — one Pocket Lab pack"
+                : signedIn
+                  ? `≈ ${packs} pack${packs === 1 ? "" : "s"} · ${totals.unsynced === 0 ? "all sent to Pocket Lab" : `${totals.unsynced} not sent yet`}`
+                  : "Sign in above to send automatically, or use the claim codes"}
+            </div>
+          </div>
+        </Row>
+        {signedIn && totals.count > 0 && (
+          <Row>
+            <Icon name="send" size={24} color="var(--color-grey-700)" />
+            <div className="tap" style={{ flex: 1, fontSize: 16, cursor: "pointer" }} onClick={sendPending}>
+              {busy === "hourglass" ? "Sending…" : "Send pending now"}
+            </div>
+          </Row>
+        )}
+        {totals.count > 0 && (
+          <>
+            <Row>
+              <Icon name="qr_code_2" size={24} color="var(--color-grey-700)" />
+              <div className="tap" style={{ flex: 1, cursor: "pointer" }} onClick={() => setCodesOpen((v) => !v)}>
+                <div style={{ fontSize: 16 }}>Recent claim codes</div>
+                <div style={{ fontSize: 14, color: "var(--color-grey-700)" }}>Type one into Pocket Lab if it didn't arrive on its own</div>
+              </div>
+              <span className="tap" style={{ cursor: "pointer" }} onClick={() => setCodesOpen((v) => !v)} aria-label="Recent claim codes">
+                <Icon name={codesOpen ? "expand_less" : "chevron_right"} size={24} color="var(--color-grey-500)" />
+              </span>
+            </Row>
+            {codesOpen && (
+              <div style={{ padding: "6px 0 10px", borderBottom: "1px solid var(--color-grey-200)" }}>
+                {recent.map((r) => (
+                  <div key={r.grant_key} style={{ padding: "8px 0" }}>
+                    <div style={{ fontSize: 14, color: "var(--color-grey-700)" }}>
+                      {new Date(r.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} · +{r.hourglasses}
+                      {r.synced_at ? " · sent" : ""}
+                    </div>
+                    <ClaimCode grantKey={r.grant_key} hourglasses={r.hourglasses} compact />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {hgMessage && <div style={{ padding: "10px 0", fontSize: 14, color: "var(--color-grey-700)" }}>{hgMessage}</div>}
 
         <SectionLabel style={{ marginTop: 28 }}>App</SectionLabel>
         <Row>
