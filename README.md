@@ -23,6 +23,25 @@ npm run dev
 
 Open the printed `http://<your-LAN-IP>:5173/simple-workout/` URL on your phone to test.
 
+```bash
+npm test
+```
+
+Runs the catalog validator (`src/v2/ladderValidation.ts`), the progression-engine tests and the media check under vitest. CI runs it before every build.
+
+### Exercise illustrations
+
+Exercise photos are pinned, committed files — the app never fetches media at runtime. `src/v2/media/manifest.json` records every exercise's source (free-exercise-db at a fixed commit, wger by image sha256, or a drawing in `assets/media-src/`), its license and whether a human has verified the pairing.
+
+```bash
+npm run media:import    # download + resize frames into .media-review/ (unverified) or src/v2/media/ (verified)
+npm run media:review    # build .media-review/index.html — check each picture against the name and how-to
+npm run media:verify -- id1,id2   # promote reviewed frames into the bundle and set mediaRef in ladders.ts
+npm run media:check     # what the build runs: nothing unverified can ship
+```
+
+To add an exercise: add it to `src/v2/ladders.ts` with `mediaRef: null`, add a manifest entry, import, review, verify. Credits are generated into `src/v2/media/CREDITS.md` and shown in Settings → About.
+
 ## Deployment
 
 Pushes to `main` deploy to GitHub Pages via `.github/workflows/deploy.yml`.

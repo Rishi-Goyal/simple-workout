@@ -9,7 +9,7 @@ import {
   saveBackupConfig,
   uploadBackup
 } from "../../lib/backupApi";
-import { EQUIP_TIER_LABELS, type EquipTier } from "../engine";
+import { EQUIP_TIER_LABELS, getExerciseV2, type EquipTier } from "../engine";
 import { getEquipTier, getPref, setPref } from "../queries";
 import { FilterChip, Icon, LightNav, SectionLabel, Switch } from "../ui";
 
@@ -39,6 +39,8 @@ export function SettingsV2() {
   const [message, setMessage] = useState<string | null>(null);
 
   const lastBackup = getLastBackupAt();
+  const [creditsOpen, setCreditsOpen] = useState(false);
+  const credits = __MEDIA_CREDITS__;
   const [updateState, setUpdateState] = useState<"idle" | "checking" | "reloading" | "up-to-date" | "failed" | "unavailable">("idle");
 
   async function onCheckUpdates() {
@@ -238,9 +240,66 @@ export function SettingsV2() {
         </Row>
 
         <SectionLabel style={{ marginTop: 28 }}>About</SectionLabel>
-        <div style={{ padding: "14px 0 24px", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-700)" }}>
-          Exercise photos from free-exercise-db (public domain). Simple Workout 2.0.
+        <div style={{ padding: "14px 0 0", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-700)" }}>
+          Simple Workout {__APP_VERSION__}.
           <br />
+          {credits.fed ? (
+            <>
+              Exercise photos: {credits.fed.count} from{" "}
+              <a href={`${credits.fed.url}/tree/${credits.fed.commit}`} target="_blank" rel="noopener" style={{ color: "var(--color-blue-700)" }}>
+                free-exercise-db
+              </a>{" "}
+              (public domain).
+            </>
+          ) : (
+            "Exercise photos: none bundled yet."
+          )}
+          {credits.local > 0 && ` ${credits.local} drawn for this app.`}
+        </div>
+        {credits.wger.length > 0 && (
+          <>
+            <Row>
+              <Icon name="palette" size={24} color="var(--color-grey-700)" />
+              <div className="tap" style={{ flex: 1, cursor: "pointer" }} onClick={() => setCreditsOpen((v) => !v)}>
+                <div style={{ fontSize: 16 }}>Illustrations from wger.de</div>
+                <div style={{ fontSize: 14, color: "var(--color-grey-700)" }}>
+                  {credits.wger.length} image{credits.wger.length === 1 ? "" : "s"} · CC-BY-SA / CC0 · tap for credits
+                </div>
+              </div>
+              <span className="tap" style={{ cursor: "pointer" }} onClick={() => setCreditsOpen((v) => !v)} aria-label="Illustration credits">
+                <Icon name={creditsOpen ? "expand_less" : "chevron_right"} size={24} color="var(--color-grey-500)" />
+              </span>
+            </Row>
+            {creditsOpen && (
+              <div style={{ padding: "10px 0 14px", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-700)", borderBottom: "1px solid var(--color-grey-200)" }}>
+                {credits.wger.map((c) => (
+                  <div key={c.exerciseId} style={{ padding: "4px 0" }}>
+                    {getExerciseV2(c.exerciseId)?.name ?? c.exerciseId} — {c.author ?? "unknown author"},{" "}
+                    {c.licenseUrl ? (
+                      <a href={c.licenseUrl} target="_blank" rel="noopener" style={{ color: "var(--color-blue-700)" }}>
+                        {c.license}
+                      </a>
+                    ) : (
+                      c.license
+                    )}
+                    {c.sourceUrl && (
+                      <>
+                        {" · "}
+                        <a href={c.sourceUrl} target="_blank" rel="noopener" style={{ color: "var(--color-blue-700)" }}>
+                          source
+                        </a>
+                      </>
+                    )}
+                  </div>
+                ))}
+                <div style={{ paddingTop: 6, fontSize: 12, color: "var(--color-grey-600)" }}>
+                  Images were resized, flattened onto white and converted to WebP. CC-BY-SA derivatives remain CC-BY-SA.
+                </div>
+              </div>
+            )}
+          </>
+        )}
+        <div style={{ padding: "10px 0 24px", fontSize: 14, lineHeight: "20px", color: "var(--color-grey-700)" }}>
           Storage:{" "}
           {{
             opfs: "on-device file (OPFS)",

@@ -12,3 +12,7 @@ tsconfig.tsbuildinfo
 .claude/launch.json
 .wrangler/
 .dev.vars
+
+# exercise-media pipeline (scripts/import-exercise-media.mjs)
+.media-cache/
+.media-review/

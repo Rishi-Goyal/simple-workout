@@ -9,6 +9,7 @@ import {
   ROTATION,
   type DayType,
   type Equipment,
+  type Implement,
   type Ladder,
   type LadderExercise,
   type PatternId,
@@ -30,9 +31,27 @@ const TIER_EQUIPMENT: Record<EquipTier, Equipment[]> = {
   full_gym: ["none", "box", "dumbbell", "band", "pullup_bar", "barbell", "bench", "machine"]
 };
 
+export const EQUIPMENT_LABELS: Record<Equipment, string> = {
+  none: "nothing",
+  box: "a box or chair",
+  band: "a band",
+  pullup_bar: "a pull-up bar",
+  dumbbell: "dumbbells",
+  barbell: "a barbell",
+  bench: "a bench",
+  machine: "a machine"
+};
+
+/** Every listed item is required (AND semantics). */
 export function usable(ex: LadderExercise, tier: EquipTier): boolean {
   const have = TIER_EQUIPMENT[tier];
   return ex.equipment.every((e) => have.includes(e));
+}
+
+/** The equipment this exercise needs that the tier doesn't provide. */
+export function missingEquipment(ex: LadderExercise, tier: EquipTier): Equipment[] {
+  const have = TIER_EQUIPMENT[tier];
+  return ex.equipment.filter((e) => !have.includes(e));
 }
 
 const ladderByPattern = new Map<PatternId, Ladder>(LADDERS.map((l) => [l.pattern, l]));
@@ -57,8 +76,9 @@ export function maxRung(pattern: PatternId): number {
   return Math.max(...getLadder(pattern).rungs.map((r) => r.rung));
 }
 
-function canonicalAt(ladder: Ladder, rung: number): LadderExercise | undefined {
-  return ladder.rungs.find((r) => r.rung === rung && r.canonical);
+/** Highest rung the tier can actually do; 0 when the whole ladder is blocked. */
+export function maxUsableRung(pattern: PatternId, tier: EquipTier): number {
+  return Math.max(0, ...getLadder(pattern).rungs.filter((r) => usable(r, tier)).map((r) => r.rung));
 }
 
 /**
@@ -66,9 +86,10 @@ function canonicalAt(ladder: Ladder, rung: number): LadderExercise | undefined {
  * canonical exercise at the level's rung, or an alternate there that the
  * equipment allows, else the nearest usable rung below (never above — missing
  * equipment must not push someone into a harder movement). The stored level
- * is untouched; only the session sees the substitution.
+ * is untouched; only the session sees the substitution. `undefined` when no
+ * rung of the ladder is usable at all (e.g. vertical pull with no bar).
  */
-export function resolveExercise(pattern: PatternId, level: number, tier: EquipTier): LadderExercise {
+export function resolveExercise(pattern: PatternId, level: number, tier: EquipTier): LadderExercise | undefined {
   const ladder = getLadder(pattern);
   for (let rung = Math.min(level, maxRung(pattern)); rung >= 1; rung--) {
     const atRung = ladder.rungs.filter((r) => r.rung === rung);
@@ -76,8 +97,7 @@ export function resolveExercise(pattern: PatternId, level: number, tier: EquipTi
       atRung.find((r) => r.canonical && usable(r, tier)) ?? atRung.find((r) => usable(r, tier));
     if (pick) return pick;
   }
-  // Nothing usable below — fall back to the ladder's easiest canonical rung.
-  return canonicalAt(ladder, 1) ?? ladder.rungs[0];
+  return undefined;
 }
 
 export type PlannedExercise = {
@@ -88,17 +108,74 @@ export type PlannedExercise = {
   totalRungs: number;
 };
 
+/** Today's plan; patterns with no usable rung for the tier are left out. */
 export function planFor(day: DayType, levels: Record<PatternId, number>, tier: EquipTier): PlannedExercise[] {
-  return DAY_TEMPLATES[day].map((pattern) => {
+  const out: PlannedExercise[] = [];
+  for (const pattern of DAY_TEMPLATES[day]) {
     const exercise = resolveExercise(pattern, levels[pattern], tier);
-    return {
+    if (!exercise) continue;
+    out.push({
       pattern,
       patternLabel: getLadder(pattern).label,
       exercise,
       rung: exercise.rung,
       totalRungs: maxRung(pattern)
-    };
-  });
+    });
+  }
+  return out;
+}
+
+export type UnavailablePattern = { pattern: PatternId; label: string; missing: Equipment[] };
+
+/** Patterns on this day the tier can't do at any rung, with what they'd need. */
+export function unavailablePatterns(day: DayType, tier: EquipTier): UnavailablePattern[] {
+  const out: UnavailablePattern[] = [];
+  for (const pattern of DAY_TEMPLATES[day]) {
+    if (maxUsableRung(pattern, tier) > 0) continue;
+    const ladder = getLadder(pattern);
+    const easiest = ladder.rungs.find((r) => r.rung === 1 && r.canonical) ?? ladder.rungs[0];
+    out.push({ pattern, label: ladder.label, missing: missingEquipment(easiest, tier) });
+  }
+  return out;
+}
+
+/** "a pull-up bar", "dumbbells and a bench". */
+export function equipmentList(items: Equipment[]): string {
+  const names = items.map((e) => EQUIPMENT_LABELS[e]);
+  if (names.length <= 1) return names[0] ?? "";
+  return names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+}
+
+/**
+ * "Too hard" target: the exercise the tier can do at the nearest rung below
+ * — the same walk prescription uses, so a demotion never lands on something
+ * the user has no equipment for.
+ */
+export function easierExercise(ex: LadderExercise, tier: EquipTier): LadderExercise | undefined {
+  const ladder = ladderOf(ex.id);
+  if (!ladder || ex.rung <= 1) return undefined;
+  return resolveExercise(ladder.pattern, ex.rung - 1, tier);
+}
+
+function canonicalAt(ladder: Ladder, rung: number): LadderExercise | undefined {
+  return ladder.rungs.find((r) => r.rung === rung && r.canonical) ?? ladder.rungs.find((r) => r.rung === rung);
+}
+
+/**
+ * Where a graduation from `ex` lands, or `undefined` at the top of the ladder.
+ *
+ * Levels are earned one rung at a time, including rungs the current equipment
+ * cannot do: the stored level climbs past them (the session keeps substituting
+ * down) until it reaches the next rung the tier can perform. When `ex` is such
+ * a substitution — below the stored level — the climb continues from the
+ * stored level, never from `ex`, so a level already held is never re-awarded.
+ */
+export function graduationTarget(ex: LadderExercise, storedLevel: number, _tier: EquipTier): LadderExercise | undefined {
+  const ladder = ladderOf(ex.id);
+  if (!ladder) return undefined;
+  const from = Math.max(ex.rung, storedLevel);
+  if (from >= maxRung(ladder.pattern)) return undefined;
+  return canonicalAt(ladder, from + 1);
 }
 
 export function nextDay(lastDay: DayType | null): DayType {
@@ -135,6 +212,26 @@ export function chipValues(t: Target): number[] {
   return [aim - 3 * step, aim - 2 * step, aim - step].filter((v) => v > 0);
 }
 
+// ---------- weights ----------
+
+/** Smallest sensible jump per implement (kg). Dumbbells come in 2 kg steps. */
+export const INCREMENT_KG: Record<Implement, number> = {
+  dumbbell: 2,
+  barbell: 2.5,
+  machine: 5,
+  added: 2.5
+};
+
+export function incrementKg(ex: LadderExercise): number {
+  return INCREMENT_KG[ex.implement ?? "barbell"];
+}
+
+/** "12 kg", or for added load "+2.5 kg" / "bodyweight". */
+export function weightLabel(ex: LadderExercise, kg: number): string {
+  if (ex.implement === "added") return kg > 0 ? `+${kg} kg` : "bodyweight";
+  return `${kg} kg`;
+}
+
 // ---------- graduation / weight progression ----------
 
 export type SessionSetLog = { value: number; weightKg: number | null };
@@ -147,8 +244,8 @@ export function hitTopOfRange(ex: LadderExercise, sets: SessionSetLog[]): boolea
 /**
  * Graduation decision for one completed exercise.
  * - top_of_range(N): needs N sessions (this one + N-1 previous) at the top.
- * - load_threshold: this session at the top with weight >= threshold.
- * - terminal: never graduates; progress is weight via bumpWeight.
+ * - load_threshold: this session at the top with every set at/above threshold.
+ * - terminal / maintain: never graduates.
  */
 export function shouldGraduate(
   ex: LadderExercise,
@@ -160,18 +257,26 @@ export function shouldGraduate(
     case "top_of_range":
       return previousTopStreak + 1 >= ex.graduate.sessions;
     case "load_threshold": {
-      const w = sets[0]?.weightKg ?? 0;
+      const w = Math.min(...sets.map((s) => s.weightKg ?? 0));
       return w >= ex.graduate.weightKg;
     }
     case "terminal":
+    case "maintain":
       return false;
   }
 }
 
-/** Double progression for loaded rungs: top of range every set -> +2.5 kg next time. */
+/**
+ * Double progression for loaded rungs: top of range every set -> one
+ * increment next time. The result snaps DOWN to the implement's grid, so a
+ * legacy off-grid value moves to the first grid point above it and never
+ * further (14.5 kg dumbbells -> 16, 17 -> 18, 62.5 kg machine -> 65).
+ */
 export function nextWeight(ex: LadderExercise, sets: SessionSetLog[], currentKg: number): number {
   if (ex.load !== "loaded") return currentKg;
-  return hitTopOfRange(ex, sets) ? Math.round((currentKg + 2.5) * 2) / 2 : currentKg;
+  if (!hitTopOfRange(ex, sets)) return currentKg;
+  const inc = incrementKg(ex);
+  return Math.floor((currentKg + inc) / inc + 1e-9) * inc;
 }
 
 // ---------- streaks ----------

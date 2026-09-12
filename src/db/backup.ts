@@ -32,6 +32,25 @@ const V2_TABLES = new Set<string>([
 
 type TableName = (typeof TABLE_ORDER)[number];
 
+// Deterministic export order per table. The v2 tables keyed by natural keys
+// have no `id` column — SQLite does not alias it to rowid, so `ORDER BY id`
+// fails at prepare time and every export used to throw.
+const TABLE_ORDER_BY: Record<TableName, string> = {
+  exercises: "id",
+  warmups: "id",
+  workouts: "id",
+  workout_exercises: "id",
+  workout_sets: "id",
+  muscle_strength_snapshot: "id",
+  warmup_completions: "id",
+  v2_levels: "pattern",
+  v2_sessions: "id",
+  v2_session_items: "session_id, position",
+  v2_sets: "id",
+  v2_prefs: "key",
+  v2_weights: "exercise_id"
+};
+
 // Known columns per table (mirrors schema.ts). Backups from a newer app
 // version may carry extra columns — those are dropped on import.
 const TABLE_COLUMNS: Record<TableName, string[]> = {
@@ -74,7 +93,7 @@ export interface BackupPayloadV1 {
 export function exportBackup(): BackupPayloadV1 {
   const tables = {} as Record<TableName, Row[]>;
   for (const table of TABLE_ORDER) {
-    tables[table] = all(`SELECT * FROM ${table} ORDER BY id`);
+    tables[table] = all(`SELECT * FROM ${table} ORDER BY ${TABLE_ORDER_BY[table]}`);
   }
   return {
     version: BACKUP_VERSION,

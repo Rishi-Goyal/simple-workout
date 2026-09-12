@@ -1,12 +1,13 @@
 import { useDbVersion } from "../../db/client";
 import { LADDERS } from "../ladders";
-import { maxRung } from "../engine";
-import { getLevels, recentPromotions } from "../queries";
+import { equipmentList, graduationTarget, maxRung, missingEquipment, resolveExercise, usable } from "../engine";
+import { getEquipTier, getLevels, recentPromotions } from "../queries";
 import { Icon, LightNav, SectionLabel } from "../ui";
 
 export function ProgressV2() {
   useDbVersion();
   const levels = getLevels();
+  const tier = getEquipTier();
   const promoted = recentPromotions();
 
   return (
@@ -22,19 +23,38 @@ export function ProgressV2() {
           {LADDERS.map((L) => {
             const rung = levels[L.pattern];
             const total = maxRung(L.pattern);
-            const current = L.rungs.find((r) => r.rung === rung && r.canonical) ?? L.rungs.find((r) => r.rung === rung);
-            const next = L.rungs.find((r) => r.rung === rung + 1 && r.canonical) ?? L.rungs.find((r) => r.rung === rung + 1);
+            // What the user actually does today (may sit below the stored rung
+            // when equipment blocks it) — the header and dots follow this, with
+            // the earned level shown alongside when the two differ.
+            const current = resolveExercise(L.pattern, rung, tier);
+            const doing = current?.rung ?? 0;
+            // What the next level-up awards: the climb continues from the
+            // stored level even while equipment holds the session lower.
+            const next = current ? graduationTarget(current, rung, tier) : undefined;
+            const easiest = L.rungs.find((r) => r.rung === 1 && r.canonical) ?? L.rungs[0];
             const isNew = promoted.has(L.pattern);
+            const nextLine = !current
+              ? `First rung: ${easiest.name}`
+              : next
+                ? usable(next, tier)
+                  ? `Next: ${next.name}`
+                  : `Next: ${next.name} — needs ${equipmentList(missingEquipment(next, tier))}`
+                : current.graduate.kind === "maintain"
+                  ? "Top of the ladder"
+                  : "Top of the ladder — progress by weight";
             return (
               <div key={L.pattern} style={{ border: "1px solid var(--color-grey-300)", borderRadius: 16, padding: "16px 20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
                   <SectionLabel>{L.label}</SectionLabel>
                   <span style={{ fontSize: 14, color: "var(--color-grey-700)", whiteSpace: "nowrap" }}>
-                    Rung {rung} of {total}
+                    Rung {doing} of {total}
+                    {rung > doing ? ` · ${rung} earned` : ""}
                   </span>
                 </div>
                 <div style={{ marginTop: 4, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontFamily: "var(--font-display)", fontSize: 22, lineHeight: "28px" }}>{current?.name}</span>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 22, lineHeight: "28px" }}>
+                    {current?.name ?? `Needs ${equipmentList(missingEquipment(easiest, tier))}`}
+                  </span>
                   {isNew && (
                     <span
                       style={{
@@ -67,18 +87,22 @@ export function ProgressV2() {
                         borderRadius: 4,
                         // filled segments sweep in left-to-right
                         animationDelay: i < rung ? `${0.08 + i * 0.05}s` : undefined,
+                        // solid: rungs the user does today · pale: earned
+                        // but blocked by equipment · grey: not yet earned
                         background:
-                          i < rung
-                            ? isNew && i === rung - 1
-                              ? "var(--color-green-500)"
-                              : "var(--color-blue-600)"
-                            : "var(--color-grey-200)"
+                          isNew && i === rung - 1
+                            ? "var(--color-green-500)"
+                            : i < doing
+                              ? "var(--color-blue-600)"
+                              : i < rung
+                                ? "var(--color-blue-200)"
+                                : "var(--color-grey-200)"
                       }}
                     />
                   ))}
                 </div>
                 <div style={{ marginTop: 8, fontSize: 14, color: "var(--color-grey-700)" }}>
-                  {next ? `Next: ${next.name}` : "Top of the ladder — progress by weight"}
+                  {nextLine}
                 </div>
               </div>
             );

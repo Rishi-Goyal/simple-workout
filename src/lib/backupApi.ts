@@ -78,7 +78,13 @@ export async function downloadLatestBackup(): Promise<BackupPayloadV1> {
 // Fire-and-forget backup after finishing a workout. Silent on failure —
 // being offline is the normal case for an installed PWA.
 export function maybeAutoBackup(): void {
-  const { url, user, password } = getBackupConfig();
-  if (!url || !user || !password) return;
-  void uploadBackup(exportBackup()).catch(() => {});
+  try {
+    const { url, user, password } = getBackupConfig();
+    if (!url || !user || !password) return;
+    // exportBackup() runs synchronously; a throw here must never escape into
+    // the finish screen's effect.
+    void uploadBackup(exportBackup()).catch(() => {});
+  } catch {
+    /* silent — backup is best-effort */
+  }
 }
