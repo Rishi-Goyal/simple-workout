@@ -42,6 +42,9 @@ export function HomeV2() {
   const warmupFirst = getPref("warmup_first") === "1";
 
   function start() {
+    // A plan can be empty if no pattern of the day has a rung this tier can do;
+    // a session with no items would crash the exercise screen.
+    if (plan.length === 0) return;
     if (unfinished) discardSession(unfinished.id);
     const id = createSession(day, plan.map((p) => p.exercise.id));
     viewTransition(() => {

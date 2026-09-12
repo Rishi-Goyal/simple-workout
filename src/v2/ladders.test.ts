@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { LADDERS, V1_NAME_MAP, WARMUPS, type PatternId } from "./ladders";
 import { maxUsableRung, type EquipTier } from "./engine";
@@ -35,35 +35,16 @@ describe("ladder catalog", () => {
 });
 
 describe("exercise media", () => {
-  const mediaDir = join(__dirname, "media");
-  const manifestPath = join(mediaDir, "manifest.json");
-  type Entry = { verified: boolean; frames: unknown[] };
-  const manifest = existsSync(manifestPath)
-    ? (JSON.parse(readFileSync(manifestPath, "utf8")) as { entries: Record<string, Entry> })
-    : { entries: {} as Record<string, Entry> };
-  const files = existsSync(mediaDir) ? readdirSync(mediaDir).filter((f) => f.endsWith(".webp")) : [];
-
-  it("mediaRef is set only for verified entries whose frames are bundled", () => {
-    for (const ex of LADDERS.flatMap((l) => l.rungs)) {
-      const entry = manifest.entries[ex.id];
-      if (ex.mediaRef) {
-        expect(ex.mediaRef, `${ex.id}: mediaRef must equal the exercise id`).toBe(ex.id);
-        expect(entry?.verified, `${ex.id}: mediaRef set but manifest entry not verified`).toBe(true);
-        for (let i = 0; i < (entry?.frames.length ?? 0); i++) {
-          expect(files, `${ex.id}: missing frame ${i}`).toContain(`${ex.id}-${i}.webp`);
-        }
-      } else {
-        expect(entry?.verified ?? false, `${ex.id}: verified in manifest but mediaRef is null`).toBe(false);
-        expect(files.filter((f) => f.startsWith(ex.id + "-")), `${ex.id}: bundled frames without mediaRef`).toEqual([]);
-      }
-    }
-  });
-
-  it("every bundled frame belongs to a catalog exercise", () => {
-    const ids = new Set(LADDERS.flatMap((l) => l.rungs.map((r) => r.id)));
-    for (const f of files) {
-      const id = f.replace(/-\d+\.webp$/, "");
-      expect(ids.has(id), `${f}: no exercise with id ${id}`).toBe(true);
+  // Runs the exact gate that `npm run build` runs (media:check) so a manifest
+  // or bundle problem fails here first instead of in the Pages deploy job. The
+  // script is executed rather than imported: its shebang line is fine for Node
+  // but not for the test transformer.
+  it("passes the media pipeline check", () => {
+    const script = join(__dirname, "..", "..", "scripts", "import-exercise-media.mjs");
+    try {
+      execFileSync(process.execPath, [script, "check"], { stdio: "pipe" });
+    } catch (e) {
+      throw new Error(String((e as { stderr?: Buffer }).stderr ?? e));
     }
   });
 });
