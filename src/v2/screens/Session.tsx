@@ -194,11 +194,12 @@ function ExerciseStep() {
 
   function tooHard() {
     if (!easierEx) return;
-    // Demote right now: the session swaps to the easier rung and the stored
-    // ladder level remembers it (only "too hard" ever demotes).
+    // Demote right now: the session swaps to the nearest rung the equipment
+    // allows, but the stored level drops by exactly one (only "too hard" ever
+    // demotes) — easierEx may sit several blocked rungs lower.
     clearSetsFor(sessionId, ex.id);
     setItemExercise(sessionId, exIdx, easierEx.id, "swapped_down");
-    setLevel(ladder.pattern, easierEx.rung);
+    setLevel(ladder.pattern, Math.max(1, ex.rung - 1));
   }
 
   return (

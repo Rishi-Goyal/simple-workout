@@ -17,7 +17,7 @@
  * refuses to ship anything unverified.
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -253,12 +253,17 @@ async function runImport(flags) {
       rows.push([id, "GAP", "no source frames"]);
       continue;
     }
-    const outDir = entry.verified ? PATHS.mediaDir : PATHS.reviewDir;
-    const allPresent = entry.frames.every((_, i) => existsSync(join(outDir, frameFile(id, i))));
-    if (entry.verified && allPresent && !flags.force) {
+    const wasVerified = entry.verified;
+    const bundledDir = wasVerified ? PATHS.mediaDir : PATHS.reviewDir;
+    const allPresent = entry.frames.every((_, i) => existsSync(join(bundledDir, frameFile(id, i))));
+    if (wasVerified && allPresent && !flags.force && !flags.repin) {
       rows.push([id, "skip", "verified & bundled"]);
       continue;
     }
+    // Load and pin every frame before writing any, so a pin change on frame 1
+    // cannot leave frame 0 already written to the wrong directory.
+    const prepared = [];
+    let repinned = false;
     for (let i = 0; i < entry.frames.length; i++) {
       const frame = entry.frames[i];
       let original;
@@ -275,14 +280,25 @@ async function runImport(flags) {
           continue;
         }
         frame.sha256 = digest;
-        entry.verified = false;
-        entry.verifiedAt = null;
+        repinned = true;
       } else if (!frame.sha256) {
         frame.sha256 = digest;
       }
-      const isSvg = /\.svg$/i.test(frame.upstream);
+      prepared.push({ i, original, isSvg: /\.svg$/i.test(frame.upstream) });
+    }
+    if (repinned) {
+      // Upstream bytes changed: the whole entry goes back to review. Retract
+      // what was bundled and the ladders.ts mediaRef so `check` stays green.
+      entry.verified = false;
+      entry.verifiedAt = null;
+      if (wasVerified) {
+        for (let i = 0; i < entry.frames.length; i++) rmSync(join(PATHS.mediaDir, frameFile(id, i)), { force: true });
+        setMediaRef(id, null);
+      }
+    }
+    const target = entry.verified ? PATHS.mediaDir : PATHS.reviewDir;
+    for (const { i, original, isSvg } of prepared) {
       const webp = await toWebp(original, isSvg);
-      const target = entry.verified ? PATHS.mediaDir : PATHS.reviewDir;
       writeFileSync(join(target, frameFile(id, i)), webp);
       rows.push([id, entry.verified ? "bundled" : "review", `frame ${i}: ${(webp.length / 1024).toFixed(1)} KB`]);
     }
@@ -314,6 +330,9 @@ function runVerify(ids) {
   const manifest = readManifest();
   const today = new Date().toISOString().slice(0, 10);
   mkdirSync(PATHS.mediaDir, { recursive: true });
+  // Validate everything first: a typo in the second id must not leave the
+  // first id's frames moved and its mediaRef set while the manifest still says
+  // unverified (a state both `check` and the tests reject).
   for (const id of ids) {
     const entry = manifest.entries[id];
     if (!entry) throw new Error(`${id}: no manifest entry`);
@@ -322,11 +341,18 @@ function runVerify(ids) {
       const from = join(PATHS.reviewDir, frameFile(id, i));
       const to = join(PATHS.mediaDir, frameFile(id, i));
       if (!existsSync(from) && !existsSync(to)) throw new Error(`${id}: ${frameFile(id, i)} not found — run import first`);
+      if (!entry.frames[i].sha256) throw new Error(`${id}: frame ${i} has no sha256 — run import first`);
+    }
+  }
+  for (const id of ids) {
+    const entry = manifest.entries[id];
+    for (let i = 0; i < entry.frames.length; i++) {
+      const from = join(PATHS.reviewDir, frameFile(id, i));
+      const to = join(PATHS.mediaDir, frameFile(id, i));
       if (existsSync(from)) {
         writeFileSync(to, readFileSync(from));
         rmSync(from);
       }
-      if (!entry.frames[i].sha256) throw new Error(`${id}: frame ${i} has no sha256 — run import first`);
     }
     entry.verified = true;
     entry.verifiedAt = today;
@@ -373,7 +399,17 @@ async function runLookupWger(ids) {
 
 // -------------------------------------------------------------------- main
 
-const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Compare real paths: Node resolves the entry script through symlinks and
+// junctions, so a plain string compare could silently skip `check` inside
+// `npm run build` on a symlinked checkout.
+function samePath(a, b) {
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return resolve(a) === resolve(b);
+  }
+}
+const isMain = Boolean(process.argv[1]) && samePath(process.argv[1], fileURLToPath(import.meta.url));
 if (isMain) {
   const [cmd = "import", ...rest] = process.argv.slice(2);
   const flags = parseArgs(rest);

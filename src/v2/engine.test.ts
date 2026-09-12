@@ -64,16 +64,22 @@ describe("graduationTarget", () => {
   it("awards the next rung when it is usable", () => {
     expect(graduationTarget(ex("sq2_bodyweight_squat"), 2, "full_gym")?.id).toBe("sq3_goblet_squat");
   });
-  it("does not award a rung the tier cannot do (would re-prescribe the same exercise forever)", () => {
-    expect(graduationTarget(ex("sq2_bodyweight_squat"), 2, "nothing")).toBeUndefined();
-    expect(graduationTarget(ex("hpu1_doorway_row"), 1, "nothing")).toBeUndefined();
+  it("climbs through a rung the tier cannot do, one level per graduation", () => {
+    // dumbbells: band row (2) -> inverted row (3, needs a barbell) -> one-arm DB row (4)
+    expect(graduationTarget(ex("hpu2_band_row"), 2, "dumbbells")?.id).toBe("hpu3_inverted_row");
+    // next session still prescribes the band row (a substitution below stored level 3)...
+    expect(resolveExercise("h_pull", 3, "dumbbells")?.id).toBe("hpu2_band_row");
+    // ...and the climb continues from the stored level, reaching the doable rung
+    expect(graduationTarget(ex("hpu2_band_row"), 3, "dumbbells")?.id).toBe("hpu4_one_arm_db_row");
   });
-  it("does not re-award a level already held when the exercise is a substitution", () => {
-    // stored level 3 (goblet squat) but doing bodyweight squat for lack of dumbbells
-    expect(graduationTarget(ex("sq2_bodyweight_squat"), 3, "full_gym")).toBeUndefined();
+  it("never re-awards a level already held when the exercise is a substitution", () => {
+    // stored level 3 (goblet squat) but doing bodyweight squat: the next award is 4, not 3
+    expect(graduationTarget(ex("sq2_bodyweight_squat"), 3, "full_gym")?.id).toBe("sq4_db_front_squat");
   });
   it("has nothing above the top rung", () => {
     expect(graduationTarget(ex("sq5_back_squat"), 5, "full_gym")).toBeUndefined();
+    // substitution while the stored level is already the top
+    expect(graduationTarget(ex("sq2_bodyweight_squat"), 5, "nothing")).toBeUndefined();
   });
 });
 
@@ -131,9 +137,12 @@ describe("nextWeight", () => {
     const added = ex("vpu6_weighted_pullup");
     expect(nextWeight(added, top(added, 2.5), 2.5)).toBe(5);
   });
-  it("snaps legacy off-grid dumbbell weights back onto the grid", () => {
+  it("snaps legacy off-grid weights onto the grid without overshooting", () => {
     const db = ex("sq3_goblet_squat");
     expect(nextWeight(db, top(db, 14.5), 14.5)).toBe(16);
+    expect(nextWeight(db, top(db, 17), 17)).toBe(18);
+    const machine = ex("sq4_alt_leg_press");
+    expect(nextWeight(machine, top(machine, 62.5), 62.5)).toBe(65);
   });
   it("holds when the top of the range was missed, and ignores bodyweight rungs", () => {
     const db = ex("sq3_goblet_squat");

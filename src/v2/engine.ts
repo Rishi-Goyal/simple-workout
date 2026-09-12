@@ -157,21 +157,25 @@ export function easierExercise(ex: LadderExercise, tier: EquipTier): LadderExerc
   return resolveExercise(ladder.pattern, ex.rung - 1, tier);
 }
 
+function canonicalAt(ladder: Ladder, rung: number): LadderExercise | undefined {
+  return ladder.rungs.find((r) => r.rung === rung && r.canonical) ?? ladder.rungs.find((r) => r.rung === rung);
+}
+
 /**
- * Where a graduation from `ex` would land, or `undefined` when there is no
- * level-up to award:
- *  - `ex` sits below the stored level (a substitution because equipment
- *    blocked the real rung) — that level is already earned; and
- *  - the rung above has nothing the tier can do — celebrating it would just
- *    re-prescribe `ex` next session and celebrate again, forever.
+ * Where a graduation from `ex` lands, or `undefined` at the top of the ladder.
+ *
+ * Levels are earned one rung at a time, including rungs the current equipment
+ * cannot do: the stored level climbs past them (the session keeps substituting
+ * down) until it reaches the next rung the tier can perform. When `ex` is such
+ * a substitution — below the stored level — the climb continues from the
+ * stored level, never from `ex`, so a level already held is never re-awarded.
  */
-export function graduationTarget(ex: LadderExercise, storedLevel: number, tier: EquipTier): LadderExercise | undefined {
+export function graduationTarget(ex: LadderExercise, storedLevel: number, _tier: EquipTier): LadderExercise | undefined {
   const ladder = ladderOf(ex.id);
   if (!ladder) return undefined;
-  if (ex.rung < storedLevel) return undefined;
-  if (ex.rung >= maxRung(ladder.pattern)) return undefined;
-  const to = resolveExercise(ladder.pattern, ex.rung + 1, tier);
-  return to && to.rung === ex.rung + 1 ? to : undefined;
+  const from = Math.max(ex.rung, storedLevel);
+  if (from >= maxRung(ladder.pattern)) return undefined;
+  return canonicalAt(ladder, from + 1);
 }
 
 export function nextDay(lastDay: DayType | null): DayType {
@@ -264,14 +268,15 @@ export function shouldGraduate(
 
 /**
  * Double progression for loaded rungs: top of range every set -> one
- * increment next time. The result snaps to the implement's grid, which also
- * repairs legacy off-grid values (14.5 kg dumbbells -> 16).
+ * increment next time. The result snaps DOWN to the implement's grid, so a
+ * legacy off-grid value moves to the first grid point above it and never
+ * further (14.5 kg dumbbells -> 16, 17 -> 18, 62.5 kg machine -> 65).
  */
 export function nextWeight(ex: LadderExercise, sets: SessionSetLog[], currentKg: number): number {
   if (ex.load !== "loaded") return currentKg;
   if (!hitTopOfRange(ex, sets)) return currentKg;
   const inc = incrementKg(ex);
-  return Math.round((currentKg + inc) / inc) * inc;
+  return Math.floor((currentKg + inc) / inc + 1e-9) * inc;
 }
 
 // ---------- streaks ----------
