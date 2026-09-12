@@ -1,9 +1,9 @@
 // Pocket Lab hourglass ledger client. Same worker and credentials as the
 // backup API; grants are pushed best-effort and re-tried on the next launch.
 import { useSyncExternalStore } from "react";
-import { getBackupConfig, type BackupConfig } from "./backupApi";
+import { authHeader, requireBackupConfig, getBackupConfig } from "./backupApi";
 import { markRewardsSynced, unsyncedRewards } from "../v2/queries";
-import type { RewardLine } from "../v2/rewards";
+import { parseRewardLines, type RewardLine } from "../v2/rewards";
 
 export type GrantPayload = {
   grant_key: string;
@@ -14,26 +14,22 @@ export type GrantPayload = {
 
 export type HourglassSummary = { earned: number; claimed: number; pending: number; grants: number };
 
-export type SyncStatus = "idle" | "sending" | "sent" | "nothing" | "not_signed_in" | "offline" | "failed";
+/**
+ * sending        a push is in flight
+ * sent           the last push finished (sent = rows acknowledged, may be 0)
+ * not_signed_in  no credentials — grants stay local, claim codes still work
+ * offline        navigator reports no network; nothing was attempted
+ * failed         request or auth error; retried on next launch / online event
+ */
+export type SyncStatus = "sending" | "sent" | "not_signed_in" | "offline" | "failed";
 export type SyncResult = { status: SyncStatus; sent: number; at: string | null };
 
-// The worker caps a single POST; anything beyond is picked up next time.
-const MAX_GRANTS_PER_PUSH = 90;
-
-function requireConfig(): BackupConfig {
-  const config = getBackupConfig();
-  if (!config.url || !config.user || !config.password) {
-    throw new Error("Set the username and password in Settings first.");
-  }
-  return config;
-}
-
-function authHeader(config: BackupConfig): string {
-  return "Basic " + btoa(`${config.user}:${config.password}`);
-}
+// Keeps each POST comfortably under the worker's 64 KB body cap; the push
+// loops until every unsynced row has been sent.
+const PUSH_BATCH = 90;
 
 export async function pushGrants(grants: GrantPayload[]): Promise<{ accepted: string[]; inserted: number }> {
-  const config = requireConfig();
+  const config = requireBackupConfig();
   const res = await fetch(`${config.url}/hourglasses/grants`, {
     method: "POST",
     headers: {
@@ -52,7 +48,7 @@ export async function pushGrants(grants: GrantPayload[]): Promise<{ accepted: st
 }
 
 export async function fetchHourglassSummary(): Promise<HourglassSummary> {
-  const config = requireConfig();
+  const config = requireBackupConfig();
   const res = await fetch(`${config.url}/hourglasses/summary`, {
     headers: { Authorization: authHeader(config) }
   });
@@ -71,10 +67,12 @@ export async function fetchHourglassSummary(): Promise<HourglassSummary> {
 
 // ---------------------------------------------------------------------------
 // Sync state — a tiny external store so the finish card and Settings can show
-// what happened without threading props through the session screen.
+// what happened without threading props through the session screen. The
+// per-grant truth is always the row's synced_at; this is only the last
+// attempt's outcome.
 // ---------------------------------------------------------------------------
 
-let lastResult: SyncResult = { status: "idle", sent: 0, at: null };
+let lastResult: SyncResult = { status: "sent", sent: 0, at: null };
 const listeners = new Set<() => void>();
 
 function setResult(r: SyncResult): void {
@@ -82,39 +80,46 @@ function setResult(r: SyncResult): void {
   listeners.forEach((l) => l());
 }
 
-export function useHourglassSync(): SyncResult {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => {
-        listeners.delete(l);
-      };
-    },
-    () => lastResult
-  );
+function subscribe(l: () => void): () => void {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
 }
 
-function parseLines(json: string): RewardLine[] {
-  try {
-    const v = JSON.parse(json);
-    return Array.isArray(v) ? (v as RewardLine[]) : [];
-  } catch {
-    return [];
-  }
+const getSnapshot = () => lastResult;
+
+export function useHourglassSync(): SyncResult {
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 let inflight: Promise<SyncResult> | null = null;
+let queued: Promise<SyncResult> | null = null;
 
 /**
- * Push every unsynced grant to the worker. Never throws. Concurrent callers
- * (app start, session finish, StrictMode double effects) share one request.
+ * Push every unsynced grant to the worker. Never throws.
+ *
+ * A call made while a sync is running does not join that run — its snapshot
+ * of unsynced rows may predate the caller's own write (finish screen minting
+ * a grant while the app-start or `online` sync is still in flight). Instead
+ * one follow-up run is queued after the current one; further callers share
+ * that queued run, so StrictMode double effects cost at most one extra pass.
  */
 export function syncPendingRewards(): Promise<SyncResult> {
-  if (inflight) return inflight;
-  inflight = doSync().finally(() => {
-    inflight = null;
-  });
-  return inflight;
+  if (!inflight) {
+    inflight = doSync().finally(() => {
+      inflight = null;
+    });
+    return inflight;
+  }
+  if (!queued) {
+    const rerun = () => {
+      queued = null;
+      return syncPendingRewards();
+    };
+    queued = inflight.then(rerun, rerun);
+  }
+  return queued;
 }
 
 async function doSync(): Promise<SyncResult> {
@@ -126,20 +131,29 @@ async function doSync(): Promise<SyncResult> {
   try {
     const { url, user, password } = getBackupConfig();
     if (!url || !user || !password) return finish("not_signed_in");
-    const rows = unsyncedRewards();
-    if (rows.length === 0) return finish("nothing");
+    let rows = unsyncedRewards();
+    if (rows.length === 0) return finish("sent", 0);
     if (typeof navigator !== "undefined" && navigator.onLine === false) return finish("offline");
     setResult({ status: "sending", sent: 0, at: null });
-    const grants: GrantPayload[] = rows.slice(0, MAX_GRANTS_PER_PUSH).map((r) => ({
-      grant_key: r.grant_key,
-      session_date: r.date,
-      hourglasses: r.hourglasses,
-      breakdown: parseLines(r.breakdown_json)
-    }));
-    const { accepted } = await pushGrants(grants);
-    markRewardsSynced(accepted);
-    return finish(accepted.length > 0 ? "sent" : "failed", accepted.length);
-  } catch {
+    let sent = 0;
+    while (rows.length > 0) {
+      const batch = rows.slice(0, PUSH_BATCH);
+      const grants: GrantPayload[] = batch.map((r) => ({
+        grant_key: r.grant_key,
+        session_date: r.date,
+        hourglasses: r.hourglasses,
+        breakdown: parseRewardLines(r.breakdown_json)
+      }));
+      const { accepted } = await pushGrants(grants);
+      markRewardsSynced(accepted);
+      sent += accepted.length;
+      // A batch the server acknowledged nothing from would loop forever.
+      if (accepted.length === 0) return finish("failed", sent);
+      rows = unsyncedRewards();
+    }
+    return finish("sent", sent);
+  } catch (err) {
+    console.warn("Pocket Lab hourglass sync failed", err);
     return finish("failed");
   }
 }

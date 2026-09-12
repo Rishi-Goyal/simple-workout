@@ -486,18 +486,17 @@ function FinishStep() {
     }
     const started = session.started_at ? new Date(session.started_at).getTime() : Date.now();
     const mins = Math.max(1, Math.round((Date.now() - started) / 60000));
+    // Streak bonus is once per calendar day: count before this session is
+    // recorded so the check does not depend on statement order below.
+    const firstSessionOfDay = finishedSessionsOn(session.date) === 0;
     finishSession(sessionId, mins, levelUps);
-    // Pocket Lab hourglasses. streaks() now includes this session; the streak
-    // bonus is once per calendar day. Best-effort: never block the screen.
+    // Pocket Lab hourglasses. streaks() now includes this session.
+    // Best-effort: never block the screen, but never fail silently either.
     try {
-      const reward = computeReward({
-        levelUps: levelUps.length,
-        streak: streaks().current,
-        firstSessionOfDay: finishedSessionsOn(session.date) <= 1
-      });
+      const reward = computeReward({ levelUps: levelUps.length, streak: streaks().current, firstSessionOfDay });
       createReward(sessionId, newGrantKey(), reward.total, reward.breakdown);
-    } catch {
-      /* rewards are a bonus, not a requirement */
+    } catch (err) {
+      console.error("Could not record Pocket Lab hourglasses for session", sessionId, err);
     }
     void publishSessionToBridge(getSession(sessionId)!);
     maybeAutoBackup(); // snapshots the reward row too

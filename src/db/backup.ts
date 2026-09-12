@@ -1,6 +1,7 @@
 import { all, notifyChange, run, type Row, type SqlValue } from "./client";
 
-export const BACKUP_VERSION = 2;
+// 1: original tables · 2: + v2_* tables · 3: + v2_rewards
+export const BACKUP_VERSION = 3;
 
 // Parents first so restore inserts satisfy FKs; deletes run in reverse.
 const TABLE_ORDER = [
@@ -32,8 +33,8 @@ const V2_TABLES = new Set<string>([
   "v2_rewards"
 ]);
 
-/** Tables added after version 2 shipped; older v2 payloads simply lack them. */
-const OPTIONAL_TABLES = new Set<string>(["v2_rewards"]);
+/** Backup version each late-added table first appeared in; older payloads lack it. */
+const TABLE_SINCE_VERSION: Partial<Record<string, number>> = { v2_rewards: 3 };
 
 type TableName = (typeof TABLE_ORDER)[number];
 
@@ -95,7 +96,7 @@ const TABLE_COLUMNS: Record<TableName, string[]> = {
 };
 
 export interface BackupPayloadV1 {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exported_at: string;
   tables: Record<TableName, Row[]>;
 }
@@ -116,13 +117,15 @@ export function exportBackup(): BackupPayloadV1 {
 // FK references survive intact; sqlite_sequence auto-bumps past explicit ids,
 // so later inserts can't collide.
 export function importBackup(payload: BackupPayloadV1): void {
-  if (payload?.version !== 1 && payload?.version !== 2) {
-    throw new Error("Unsupported backup format (expected version 1 or 2).");
+  if (payload?.version !== 1 && payload?.version !== 2 && payload?.version !== 3) {
+    throw new Error("Unsupported backup format (expected version 1, 2 or 3).");
   }
   for (const table of TABLE_ORDER) {
     if (!Array.isArray(payload.tables?.[table])) {
-      // v1 backups predate the v2 tables — treat them as empty.
-      if ((payload.version === 1 && V2_TABLES.has(table)) || OPTIONAL_TABLES.has(table)) {
+      // Older payloads predate some tables — treat those as empty. A payload
+      // new enough to contain the table must actually contain it.
+      const since = TABLE_SINCE_VERSION[table] ?? (V2_TABLES.has(table) ? 2 : 1);
+      if (payload.version < since) {
         payload.tables[table] = [];
         continue;
       }

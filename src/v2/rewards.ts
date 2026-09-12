@@ -70,18 +70,22 @@ function defaultRandom(n: number): Uint8Array {
   return bytes;
 }
 
-/** 8 random Crockford chars (40 bits). `rand` is injectable for tests. */
+/**
+ * 8 random Crockford chars (40 bits). 256 is a multiple of 32, so `byte % 32`
+ * is exactly uniform with no rejection step. `rand` is injectable for tests.
+ */
 export function newGrantKey(rand: (n: number) => Uint8Array = defaultRandom): string {
-  let out = "";
-  while (out.length < GRANT_KEY_LENGTH) {
-    for (const byte of rand(GRANT_KEY_LENGTH)) {
-      // Rejection sampling: 224 = 7 × 32, so `% 32` stays unbiased.
-      if (byte >= 224) continue;
-      out += GRANT_KEY_ALPHABET[byte % 32];
-      if (out.length === GRANT_KEY_LENGTH) break;
-    }
+  return Array.from(rand(GRANT_KEY_LENGTH), (b) => GRANT_KEY_ALPHABET[b % 32]).join("");
+}
+
+/** Stored breakdown_json → lines; tolerant of anything that isn't an array. */
+export function parseRewardLines(json: string): RewardLine[] {
+  try {
+    const v = JSON.parse(json);
+    return Array.isArray(v) ? (v as RewardLine[]) : [];
+  } catch {
+    return [];
   }
-  return out;
 }
 
 // ---------------------------------------------------------------------------

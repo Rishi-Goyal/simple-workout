@@ -104,9 +104,17 @@ export function SettingsV2() {
         setHgMessage("Couldn't reach the server — check your connection or password.");
         return;
       }
-      const summary = await fetchHourglassSummary();
-      const sent = r.status === "sent" ? `Sent ${r.sent}. ` : "";
-      setHgMessage(`${sent}Pocket Lab has ${summary.pending} hourglass${summary.pending === 1 ? "" : "es"} waiting to be claimed.`);
+      if (r.status === "offline") {
+        setHgMessage("You're offline — pending hourglasses will send when you're back online.");
+        return;
+      }
+      const sent = r.sent > 0 ? `Sent ${r.sent}. ` : "Nothing new to send. ";
+      try {
+        const summary = await fetchHourglassSummary();
+        setHgMessage(`${sent}Pocket Lab has ${summary.pending} hourglass${summary.pending === 1 ? "" : "es"} waiting to be claimed.`);
+      } catch {
+        setHgMessage(sent.trim());
+      }
     } catch (e) {
       setHgMessage(String((e as Error).message ?? e));
     } finally {

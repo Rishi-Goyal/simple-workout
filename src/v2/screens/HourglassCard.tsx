@@ -4,27 +4,29 @@
  */
 import { useEffect, useState } from "react";
 import { useDbVersion } from "../../db/client";
-import { useHourglassSync, type SyncStatus } from "../../lib/hourglassApi";
-import { getReward } from "../queries";
-import { canClaimCodesHere, makeClaimCode, type RewardLine } from "../rewards";
+import { useHourglassSync, type SyncResult } from "../../lib/hourglassApi";
+import { getReward, type RewardRow } from "../queries";
+import { canClaimCodesHere, makeClaimCode, parseRewardLines } from "../rewards";
 import { Icon } from "../ui";
 
-const STATUS_TEXT: Record<SyncStatus, { icon: string; text: string }> = {
-  idle: { icon: "cloud_upload", text: "Sending to Pocket Lab…" },
-  sending: { icon: "cloud_upload", text: "Sending to Pocket Lab…" },
-  sent: { icon: "cloud_done", text: "Sent to Pocket Lab" },
-  nothing: { icon: "cloud_upload", text: "Sending to Pocket Lab…" },
-  not_signed_in: { icon: "cloud_off", text: "Not signed in — type the code below into Pocket Lab" },
-  offline: { icon: "cloud_off", text: "Will send when online" },
-  failed: { icon: "cloud_off", text: "Couldn't reach the server — will retry next launch" }
-};
-
-function parseLines(json: string): RewardLine[] {
-  try {
-    const v = JSON.parse(json);
-    return Array.isArray(v) ? (v as RewardLine[]) : [];
-  } catch {
-    return [];
+/**
+ * The row's synced_at is the truth for this grant. The shared sync result only
+ * explains *why* an unsynced row is still unsynced; it never promotes a row to
+ * "sent" — a batch elsewhere may have finished without including this grant.
+ */
+function statusFor(reward: RewardRow, sync: SyncResult): { icon: string; text: string } {
+  if (reward.synced_at) return { icon: "cloud_done", text: "Sent to Pocket Lab" };
+  switch (sync.status) {
+    case "sending":
+      return { icon: "cloud_upload", text: "Sending to Pocket Lab…" };
+    case "not_signed_in":
+      return { icon: "cloud_off", text: "Not signed in — type the code below into Pocket Lab" };
+    case "offline":
+      return { icon: "cloud_off", text: "Will send when online" };
+    case "failed":
+      return { icon: "cloud_off", text: "Couldn't reach the server — will retry next launch" };
+    case "sent":
+      return { icon: "cloud_off", text: "Not sent yet — use the code below, or Settings › Send pending now" };
   }
 }
 
@@ -33,8 +35,8 @@ export function HourglassCard({ sessionId }: { sessionId: number }) {
   const sync = useHourglassSync();
   const reward = getReward(sessionId);
   if (!reward) return null;
-  const lines = parseLines(reward.breakdown_json);
-  const status = reward.synced_at ? STATUS_TEXT.sent : STATUS_TEXT[sync.status];
+  const lines = parseRewardLines(reward.breakdown_json);
+  const status = statusFor(reward, sync);
 
   return (
     <div className="anim-fade-up anim-d2" style={{ marginTop: 12, padding: "16px 20px", borderRadius: 16, background: "var(--color-blue-50)" }}>
@@ -56,6 +58,21 @@ export function HourglassCard({ sessionId }: { sessionId: number }) {
   );
 }
 
+// Codes are a pure function of (key, count); cache them so re-mounts (Settings
+// disclosure, finish screen re-renders) don't redo the HMAC.
+const codeCache = new Map<string, Promise<string>>();
+
+function cachedClaimCode(grantKey: string, hourglasses: number): Promise<string> {
+  const k = `${grantKey}|${hourglasses}`;
+  let p = codeCache.get(k);
+  if (!p) {
+    p = makeClaimCode(grantKey, hourglasses);
+    codeCache.set(k, p);
+    p.catch(() => codeCache.delete(k));
+  }
+  return p;
+}
+
 export function ClaimCode({ grantKey, hourglasses, compact = false }: { grantKey: string; hourglasses: number; compact?: boolean }) {
   const [code, setCode] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -69,7 +86,7 @@ export function ClaimCode({ grantKey, hourglasses, compact = false }: { grantKey
       return;
     }
     setUnavailable(false);
-    makeClaimCode(grantKey, hourglasses)
+    cachedClaimCode(grantKey, hourglasses)
       .then((c) => {
         if (!cancelled) setCode(c);
       })

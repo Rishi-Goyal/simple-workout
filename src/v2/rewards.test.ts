@@ -68,11 +68,10 @@ describe("newGrantKey", () => {
     expect(seen.size).toBe(1000);
   });
 
-  it("is deterministic under an injected source and rejects biased bytes", () => {
+  it("is deterministic under an injected source", () => {
     expect(newGrantKey((n) => new Uint8Array(n))).toBe("00000000");
-    let calls = 0;
-    const rand = (n: number) => new Uint8Array(n).fill(calls++ === 0 ? 255 : 31);
-    expect(newGrantKey(rand)).toBe("ZZZZZZZZ");
+    expect(newGrantKey((n) => new Uint8Array(n).fill(255))).toBe("ZZZZZZZZ");
+    expect(newGrantKey(() => new Uint8Array([0, 1, 31, 32, 33, 63, 224, 255]))).toBe("01Z01Z0Z");
   });
 });
 

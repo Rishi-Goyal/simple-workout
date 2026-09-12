@@ -33,7 +33,9 @@ const MAX_GRANTS_PER_POST = 500;
 const MAX_CLAIM_KEYS = 500;
 const MAX_BREAKDOWN_CHARS = 2000;
 
-const GRANT_KEY_RE = /^[0-9A-Z]{8,32}$/;
+// Exactly what the workout app mints: 8 chars, Crockford base32 (no I L O U).
+// Pocket Lab dedupes on this key, so nothing wider may enter the ledger.
+const GRANT_KEY_RE = /^[0-9A-HJKMNP-TV-Z]{8}$/;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 type GrantIn = { grant_key: string; session_date: string; hourglasses: number; breakdown_json: string };
@@ -73,7 +75,10 @@ function authenticate(request: Request, env: Env): string | null {
   if (!header.startsWith("Basic ")) return null;
   let decoded: string;
   try {
-    decoded = atob(header.slice(6));
+    // Clients UTF-8 encode "user:password" before base64 (plain btoa cannot
+    // carry characters above U+00FF); decode the bytes back the same way.
+    const bin = atob(header.slice(6));
+    decoded = new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
   } catch {
     return null;
   }
@@ -168,8 +173,8 @@ export default {
         } catch {
           return json({ error: "invalid JSON" }, 400, cors);
         }
-        // v1 payloads have the original 7 tables; v2 adds the v2_* tables.
-        if ((body.version !== 1 && body.version !== 2) || typeof body.tables !== "object" || body.tables === null) {
+        // v1: original 7 tables · v2: + v2_* tables · v3: + v2_rewards.
+        if (![1, 2, 3].includes(body.version as number) || typeof body.tables !== "object" || body.tables === null) {
           return json({ error: "unsupported backup format" }, 400, cors);
         }
 
@@ -290,21 +295,21 @@ export default {
           return json({ error: "bad grant_key" }, 400, cors);
         }
 
-        // `claimed_at IS NULL` is evaluated inside the single write, so two
-        // racing claims can't both flip the same row; only rows flipped by
-        // THIS call are returned. Unknown or already-claimed keys are absent.
+        // `claimed_at IS NULL` is evaluated inside the write, so two racing
+        // claims can't both flip the same row; only rows flipped by THIS call
+        // are returned. Unknown or already-claimed keys are absent. All chunks
+        // run in one batch so a claim is all-or-nothing.
         const claimedAt = new Date().toISOString();
-        const claimed: { grant_key: string; hourglasses: number }[] = [];
-        for (const part of chunk(keys as string[], IN_CHUNK)) {
-          const rows = await env.DB.prepare(
-            `UPDATE hourglass_grants SET claimed_at = ?
-             WHERE username = ? AND claimed_at IS NULL AND grant_key IN (${placeholders(part.length)})
-             RETURNING grant_key, hourglasses`
+        const results = await env.DB.batch(
+          chunk(keys as string[], IN_CHUNK).map((part) =>
+            env.DB.prepare(
+              `UPDATE hourglass_grants SET claimed_at = ?
+               WHERE username = ? AND claimed_at IS NULL AND grant_key IN (${placeholders(part.length)})
+               RETURNING grant_key, hourglasses`
+            ).bind(claimedAt, user, ...part)
           )
-            .bind(claimedAt, user, ...part)
-            .all<{ grant_key: string; hourglasses: number }>();
-          claimed.push(...rows.results);
-        }
+        );
+        const claimed = results.flatMap((r) => (r.results ?? []) as { grant_key: string; hourglasses: number }[]);
         const credited = claimed.reduce((n, r) => n + r.hourglasses, 0);
         return json({ credited, keys: claimed.map((r) => r.grant_key), claimed_at: claimedAt }, 200, cors);
       }

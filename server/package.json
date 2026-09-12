@@ -7,9 +7,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:init:local": "wrangler d1 execute workout-backups --local --file=./schema.sql",
-    "db:init:remote": "wrangler d1 execute workout-backups --remote --file=./schema.sql",
-    "db:migrate:local": "wrangler d1 migrations apply workout-backups --local",
-    "db:migrate:remote": "wrangler d1 migrations apply workout-backups --remote"
+    "db:init:remote": "wrangler d1 execute workout-backups --remote --file=./schema.sql"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250620.0",
